@@ -46,3 +46,5 @@ pub mod spaces;
 pub mod type_registry;
 /// Filesystem watcher for auto-ingest on file save.
 pub mod watch;
+/// Embedded Hugo CMS web preview scaffold and runners.
+pub mod web;

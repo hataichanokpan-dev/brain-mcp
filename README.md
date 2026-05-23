@@ -21,6 +21,7 @@ Git-backed knowledge engine สำหรับ agent ที่คุยผ่า
 - commit เข้า Git เพื่อ audit และ rollback
 - expose tools ผ่าน MCP stdio หรือ MCP HTTP
 - ใช้กับ Codex และ Claude Code ได้โดยเพิ่ม MCP server config
+- มี Hugo web UI สำหรับ browse wiki ใน browser โดย mount content จาก `wiki/` โดยตรง
 
 ชื่อ binary ตอนนี้ยังเป็น:
 
@@ -62,6 +63,7 @@ Important: `semantic_search` currently maps to the existing BM25 search. Hybrid 
 - Rust 1.95+
 - Git
 - Windows, macOS, or Linux
+- Optional web UI: Hugo Extended 0.147+
 - For integration tests: Python 3.11+ and `uv`
 
 This repo includes `rust-toolchain.toml`, so `cargo` will use Rust 1.95 automatically when available.
@@ -126,6 +128,7 @@ brain/
   schemas/           # JSON schemas
   inbox/             # ingest staging
   raw/               # raw/archive material
+  site/              # Hugo web UI scaffold
   wiki.toml
   .git/
 ```
@@ -224,6 +227,40 @@ llm-wiki ingest profile --wiki brain
 llm-wiki ingest procedural --wiki brain
 ```
 
+## Web UI
+
+`spaces create` จะติดตั้ง Hugo scaffold ไว้ที่ `site/` ให้อัตโนมัติ. ถ้าเป็น wiki เก่าหรือ wiki ที่ register จาก repo เดิม ให้รัน:
+
+```bash
+llm-wiki web install --wiki brain
+```
+
+เปิด web preview:
+
+```bash
+llm-wiki web serve --wiki brain
+```
+
+แล้วเปิด:
+
+```text
+http://127.0.0.1:1313/
+```
+
+Build static site:
+
+```bash
+llm-wiki web build --wiki brain --minify
+```
+
+ตรวจสถานะ:
+
+```bash
+llm-wiki web status --wiki brain
+```
+
+Web UI ใช้ scaffold ที่ vendor มาจาก `geronimo-iia/llm-wiki-hugo-cms` และ mount content จาก `wiki/` โดยตรง จึงไม่มีการ copy Markdown ออกจาก source of truth.
+
 ## Run As MCP Server
 
 Default mode is MCP over stdio:
@@ -257,6 +294,14 @@ llm-wiki serve --acp --http :47778
 ```
 
 Why: ACP uses stdio. MCP stdio and ACP cannot share the same stdio stream, so when ACP is enabled, run MCP through HTTP.
+
+Start MCP server and web UI together:
+
+```bash
+llm-wiki serve --watch --web
+```
+
+MCP stays on stdio by default, and the web UI is available at `http://127.0.0.1:1313/`.
 
 ## Configure Codex
 

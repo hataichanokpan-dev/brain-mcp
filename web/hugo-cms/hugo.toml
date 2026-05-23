@@ -1,0 +1,53 @@
+baseURL = "https://example.github.io/my-wiki/"
+title = "My Wiki"
+languageCode = "en"
+
+# Point directly at the wiki content directory.
+# Option A (Hugo site at wiki repo root): contentDir = "wiki"
+# Option B (Hugo site in a site/ subdirectory):
+# contentDir is set via module mount below (supports excludeFiles patterns)
+
+# Frontmatter field mapping
+[frontmatter]
+  lastmod = ["last_updated", ":git"]
+  date    = ["last_updated", ":git"]
+
+# Taxonomies from wiki frontmatter
+[taxonomies]
+  tag    = "tags"
+  author = "owner"
+  type   = "type"
+
+# Mount wiki/ as the content directory, excluding non-content folders
+[module]
+  [[module.mounts]]
+    source = "../wiki"
+    target = "content"
+    excludeFiles = [
+      "inbox/**",
+      "raw/**",
+      "schemas/**",
+      "**/*.json",
+      "**/*.txt",
+      "**/LINT.md",
+    ]
+
+# Markup
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true        # required for mermaid fenced blocks and raw HTML
+  [markup.highlight]
+    style = "monokai"
+
+# Output formats
+[outputs]
+  home    = ["HTML", "RSS"]
+  section = ["HTML", "RSS"]
+
+[params]
+  description = "A wiki powered by llm-wiki and Hugo"
+  mermaid     = true
+  showMetadata   = true
+  showBacklinks  = true
+  showSuperseded = true

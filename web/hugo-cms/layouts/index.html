@@ -1,0 +1,21 @@
+{{ define "main" }}
+<section class="home">
+  <h1>{{ .Site.Title }}</h1>
+  {{ with .Site.Params.description }}<p class="site-description">{{ . }}</p>{{ end }}
+
+  {{ $sections := .Site.Sections }}
+  {{ range $sections }}
+  <div class="home-section">
+    <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+    <ul class="page-list">
+      {{ range first 5 .Pages.ByTitle }}
+      {{ partial "page-list-item.html" . }}
+      {{ end }}
+      {{ if gt (len .Pages) 5 }}
+      <li class="more"><a href="{{ .RelPermalink }}">All {{ len .Pages }} pages →</a></li>
+      {{ end }}
+    </ul>
+  </div>
+  {{ end }}
+</section>
+{{ end }}

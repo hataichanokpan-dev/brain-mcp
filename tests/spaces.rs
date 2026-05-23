@@ -42,6 +42,8 @@ fn create_builds_wiki_structure() {
     assert!(wiki_path.join("inbox").is_dir());
     assert!(wiki_path.join("raw").is_dir());
     assert!(wiki_path.join("schemas").is_dir());
+    assert!(wiki_path.join("site").join("hugo.toml").is_file());
+    assert!(wiki_path.join("site").join("layouts").is_dir());
     assert!(wiki_path.join("README.md").is_file());
     assert!(wiki_path.join("wiki.toml").is_file());
     assert!(wiki_path.join(".git").is_dir());
@@ -479,6 +481,8 @@ fn create_with_custom_wiki_root_creates_correct_directory() {
     );
     let toml_content = std::fs::read_to_string(wiki_path.join("wiki.toml")).unwrap();
     assert!(toml_content.contains("wiki_root = \"skills\""));
+    let hugo_content = std::fs::read_to_string(wiki_path.join("site/hugo.toml")).unwrap();
+    assert!(hugo_content.contains("source = \"../skills\""));
 }
 
 #[test]

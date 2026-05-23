@@ -4,7 +4,8 @@ use anyhow::Result;
 use clap::Parser;
 
 use llm_wiki::cli::{
-    Cli, Commands, ConfigAction, ContentAction, IndexAction, LogsAction, SchemaAction, SpacesAction,
+    Cli, Commands, ConfigAction, ContentAction, IndexAction, LogsAction, SchemaAction,
+    SpacesAction, WebAction,
 };
 use llm_wiki::config;
 use llm_wiki::engine::WikiEngine;
@@ -20,6 +21,24 @@ fn global_config_path(cli_override: Option<&Path>) -> PathBuf {
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     PathBuf::from(home).join(".llm-wiki").join("config.toml")
+}
+
+fn selected_wiki_paths(
+    config_path: &Path,
+    explicit_wiki: Option<&str>,
+) -> Result<(String, PathBuf, String)> {
+    let manager = WikiEngine::build(config_path)?;
+    let engine = manager.state.read().map_err(|_| anyhow::anyhow!("lock"))?;
+    let wiki_name = engine.resolve_wiki_name(explicit_wiki).to_string();
+    let space = engine.space(&wiki_name)?;
+    let repo_root = space.repo_root.clone();
+    let wiki_root = space
+        .wiki_root
+        .strip_prefix(&space.repo_root)
+        .unwrap_or_else(|_| Path::new("wiki"))
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok((wiki_name, repo_root, wiki_root))
 }
 
 fn main() -> Result<()> {
@@ -612,10 +631,73 @@ fn main() -> Result<()> {
             }
         }
 
+        Commands::Web { action } => {
+            let (wiki_name, repo_root, wiki_root) =
+                selected_wiki_paths(&config_path, cli.wiki.as_deref())?;
+
+            match action {
+                WebAction::Install { force, title } => {
+                    let title = title.unwrap_or_else(|| wiki_name.clone());
+                    let report =
+                        llm_wiki::web::install_hugo_site(&repo_root, &title, &wiki_root, force)?;
+                    println!(
+                        "Installed web UI at {} ({} written, {} skipped)",
+                        report.site_path, report.written, report.skipped
+                    );
+                }
+                WebAction::Serve { port, bind, drafts } => {
+                    if !llm_wiki::web::is_installed(&repo_root) {
+                        llm_wiki::web::install_hugo_site(
+                            &repo_root, &wiki_name, &wiki_root, false,
+                        )?;
+                    }
+                    println!("Web UI: http://{bind}:{port}/");
+                    let mut child =
+                        llm_wiki::web::spawn_hugo_server(&repo_root, &bind, port, drafts)?;
+                    let status = child.wait()?;
+                    if !status.success() {
+                        std::process::exit(status.code().unwrap_or(1));
+                    }
+                }
+                WebAction::Build { minify } => {
+                    if !llm_wiki::web::is_installed(&repo_root) {
+                        llm_wiki::web::install_hugo_site(
+                            &repo_root, &wiki_name, &wiki_root, false,
+                        )?;
+                    }
+                    let status = llm_wiki::web::build_hugo_site(&repo_root, minify)?;
+                    if !status.success() {
+                        std::process::exit(status.code().unwrap_or(1));
+                    }
+                }
+                WebAction::Status => {
+                    let site = llm_wiki::web::site_path(&repo_root);
+                    println!("wiki:      {wiki_name}");
+                    println!("repo:      {}", repo_root.display());
+                    println!("site:      {}", site.display());
+                    println!(
+                        "installed: {}",
+                        if llm_wiki::web::is_installed(&repo_root) {
+                            "yes"
+                        } else {
+                            "no"
+                        }
+                    );
+                    match llm_wiki::web::hugo_version()? {
+                        Some(version) => println!("hugo:      {version}"),
+                        None => println!("hugo:      not found on PATH"),
+                    }
+                }
+            }
+        }
+
         Commands::Serve {
             http,
             acp,
             watch,
+            web,
+            web_port,
+            web_bind,
             dry_run,
         } => {
             if dry_run {
@@ -629,6 +711,9 @@ fn main() -> Result<()> {
                 if watch {
                     transports.push("watch".to_string());
                 }
+                if web {
+                    transports.push("web".to_string());
+                }
                 println!("Would start: [{}]", transports.join("] ["));
                 return Ok(());
             }
@@ -636,8 +721,27 @@ fn main() -> Result<()> {
             let http_port = http
                 .and_then(|opt| opt.and_then(|s| s.trim_start_matches(':').parse::<u16>().ok()));
 
+            let mut web_child = if web {
+                let (wiki_name, repo_root, wiki_root) =
+                    selected_wiki_paths(&config_path, cli.wiki.as_deref())?;
+                if !llm_wiki::web::is_installed(&repo_root) {
+                    llm_wiki::web::install_hugo_site(&repo_root, &wiki_name, &wiki_root, false)?;
+                }
+                println!("Web UI: http://{web_bind}:{web_port}/");
+                Some(llm_wiki::web::spawn_hugo_server(
+                    &repo_root, &web_bind, web_port, true,
+                )?)
+            } else {
+                None
+            };
+
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(llm_wiki::server::serve(&config_path, http_port, acp, watch))?;
+            let result = rt.block_on(llm_wiki::server::serve(&config_path, http_port, acp, watch));
+            if let Some(child) = web_child.as_mut() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            result?;
         }
 
         // ── Stats ───────────────────────────────────────────────────────

@@ -1,0 +1,11 @@
+{{ $slug := .Params.superseded_by }}
+{{ $target := .Site.GetPage $slug }}
+<div class="superseded-banner" role="alert">
+  ⚠️ This page has been superseded by
+  {{ if $target }}
+    <a href="{{ $target.RelPermalink }}">{{ $target.Title }}</a>.
+  {{ else }}
+    <code>{{ $slug }}</code>.
+  {{ end }}
+  The content below may be outdated.
+</div>

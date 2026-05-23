@@ -1,0 +1,73 @@
+{{ define "main" }}
+<article class="page">
+  <header class="page-header">
+    <h1 class="page-title">{{ .Title }}</h1>
+    {{ if .Site.Params.showMetadata }}
+      {{ partial "metadata.html" . }}
+    {{ end }}
+  </header>
+
+  {{ if and .Site.Params.showSuperseded .Params.superseded_by }}
+    {{ partial "superseded.html" . }}
+  {{ end }}
+
+  {{ if .Params.tldr }}
+  <div class="tldr">
+    <strong>TL;DR:</strong> {{ .Params.tldr }}
+  </div>
+  {{ end }}
+
+  <div class="page-content">
+    {{ .Content }}
+  </div>
+
+  {{ if or .Params.sources .Params.concepts }}
+  <section class="related-pages">
+    <h2>Related</h2>
+    {{ if .Params.sources }}
+    <div class="related-group">
+      <h3>Sources</h3>
+      <ul>
+        {{ range .Params.sources }}
+        {{ $slug := . }}
+        {{ $page := $.Site.GetPage $slug }}
+        <li>
+          {{ if $page }}
+            <a href="{{ $page.RelPermalink }}">{{ $page.Title }}</a>
+            {{ with $page.Params.summary }}<span class="summary">— {{ . }}</span>{{ end }}
+          {{ else }}
+            <span class="broken-ref">{{ $slug }}</span>
+          {{ end }}
+        </li>
+        {{ end }}
+      </ul>
+    </div>
+    {{ end }}
+    {{ if .Params.concepts }}
+    <div class="related-group">
+      <h3>Concepts</h3>
+      <ul>
+        {{ range .Params.concepts }}
+        {{ $slug := . }}
+        {{ $page := $.Site.GetPage $slug }}
+        <li>
+          {{ if $page }}
+            <a href="{{ $page.RelPermalink }}">{{ $page.Title }}</a>
+            {{ with $page.Params.summary }}<span class="summary">— {{ . }}</span>{{ end }}
+          {{ else }}
+            <span class="broken-ref">{{ $slug }}</span>
+          {{ end }}
+        </li>
+        {{ end }}
+      </ul>
+    </div>
+    {{ end }}
+  </section>
+  {{ end }}
+
+  {{ if and .Site.Params.showBacklinks }}
+    {{ partial "backlinks.html" . }}
+  {{ end }}
+
+</article>
+{{ end }}

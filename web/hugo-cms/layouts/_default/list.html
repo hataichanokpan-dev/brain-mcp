@@ -1,0 +1,35 @@
+{{ define "main" }}
+<section class="section">
+  <header class="section-header">
+    <h1>{{ .Title }}</h1>
+    {{ with .Content }}<div class="section-intro">{{ . }}</div>{{ end }}
+  </header>
+
+  {{ $pages := .Pages | complement (where .Pages "Params.status" "archived") }}
+  {{ $byType := $pages.GroupByParam "type" }}
+
+  {{ if gt (len $byType) 1 }}
+    {{/* Multiple types — group by type */}}
+    {{ range $byType }}
+    <div class="type-group">
+      <h2 class="type-heading">
+        <span class="type-badge type-{{ .Key | urlize }}">{{ .Key | default "other" }}</span>
+        <span class="type-count">({{ len .Pages }})</span>
+      </h2>
+      <ul class="page-list">
+        {{ range .Pages.ByTitle }}
+        {{ partial "page-list-item.html" . }}
+        {{ end }}
+      </ul>
+    </div>
+    {{ end }}
+  {{ else }}
+    {{/* Single type — flat list */}}
+    <ul class="page-list">
+      {{ range $pages.ByTitle }}
+      {{ partial "page-list-item.html" . }}
+      {{ end }}
+    </ul>
+  {{ end }}
+</section>
+{{ end }}

@@ -86,4 +86,7 @@ llm-wiki --version
 ## Prerequisites
 
 - `git` — required for wiki repositories (commit, diff, history)
-- No runtime dependencies — llm-wiki is a single static binary
+- No required runtime dependencies — llm-wiki is a single static binary
+- Optional web UI: [Hugo Extended](https://gohugo.io/installation/) 0.147+.
+  The binary can install the `site/` scaffold without Hugo, but `llm-wiki web serve`
+  and `llm-wiki web build` need `hugo` on `PATH`.

@@ -1,0 +1,31 @@
+{{/*
+  Backlinks: pages that reference the current page via frontmatter
+  `sources` or `concepts` fields. Body [[wikilinks]] are not indexed
+  here — use wiki_content_read(backlinks: true) for full backlinks.
+*/}}
+{{ $currentSlug := .File.Path | strings.TrimSuffix ".md" | strings.TrimSuffix "/index" }}
+{{ $backlinks := slice }}
+{{ range .Site.Pages }}
+  {{ $page := . }}
+  {{ $refs := union (.Params.sources | default slice) (.Params.concepts | default slice) }}
+  {{ range $refs }}
+    {{ if eq . $currentSlug }}
+      {{ $backlinks = $backlinks | append $page }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{ if $backlinks }}
+<section class="backlinks">
+  <h2>Pages that link here</h2>
+  <ul>
+    {{ range $backlinks }}
+    <li>
+      <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+      {{ with .Params.type }}<span class="type-badge type-{{ . | urlize }}">{{ . }}</span>{{ end }}
+      {{ with .Params.summary }}<span class="summary">— {{ . }}</span>{{ end }}
+    </li>
+    {{ end }}
+  </ul>
+</section>
+{{ end }}

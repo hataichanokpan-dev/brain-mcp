@@ -1,0 +1,31 @@
+<div class="page-metadata">
+  {{ with .Params.type }}
+  <span class="type-badge type-{{ . | urlize }}">{{ . }}</span>
+  {{ end }}
+
+  {{ with .Params.status }}
+  {{ if ne . "active" }}
+  <span class="status-badge status-{{ . }}">{{ . }}</span>
+  {{ end }}
+  {{ end }}
+
+  {{ with .Params.confidence }}
+  <span class="confidence" title="Confidence">{{ printf "%.0f%%" (mul . 100) }} confidence</span>
+  {{ end }}
+
+  {{ with .Params.owner }}
+  <span class="owner">by {{ . }}</span>
+  {{ end }}
+
+  {{ if not .Lastmod.IsZero }}
+  <span class="lastmod">updated <time datetime="{{ .Lastmod.Format "2006-01-02" }}">{{ .Lastmod.Format "2006-01-02" }}</time></span>
+  {{ end }}
+
+  {{ with .Params.tags }}
+  <div class="tags">
+    {{ range . }}
+    <a href="{{ "/tags/" | relURL }}{{ . | urlize }}/" class="tag">{{ . }}</a>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>

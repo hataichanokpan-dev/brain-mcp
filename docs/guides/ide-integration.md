@@ -270,3 +270,21 @@ external edits are picked up automatically within ~500ms:
 ```
 
 Or standalone: `llm-wiki watch`.
+
+## Web Preview
+
+Every newly created wiki gets a Hugo scaffold in `site/`. For an existing
+registered wiki, run `llm-wiki web install --wiki <name>` once. To run MCP and
+the local web UI together:
+
+```json
+"args": ["serve", "--watch", "--web"]
+```
+
+The MCP server still uses the configured transport. The web UI is served by
+Hugo at `http://127.0.0.1:1313/` and requires Hugo Extended 0.147+ on `PATH`.
+For a standalone browser preview, run:
+
+```bash
+llm-wiki web serve --wiki research
+```

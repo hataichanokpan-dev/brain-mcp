@@ -40,6 +40,9 @@ This creates:
 │   └── ...
 ├── inbox/
 ├── raw/
+├── site/
+│   ├── hugo.toml
+│   └── layouts/
 └── wiki/
 ```
 
@@ -48,6 +51,16 @@ The first wiki becomes the default. Check:
 ```bash
 llm-wiki spaces list
 ```
+
+The `site/` directory is a Hugo web UI scaffold. If Hugo Extended is installed,
+preview the wiki in a browser:
+
+```bash
+llm-wiki web serve --wiki research
+```
+
+Open `http://127.0.0.1:1313/`. The site mounts `wiki/` directly, so content
+stays in the Git-backed wiki.
 
 ## 3. Create a Page
 

@@ -190,6 +190,12 @@ pub enum Commands {
         #[arg(long)]
         status: Option<String>,
     },
+    /// Install, build, and preview the Hugo web UI
+    Web {
+        /// The web subcommand.
+        #[command(subcommand)]
+        action: WebAction,
+    },
     /// Start the wiki MCP/ACP server
     Serve {
         /// Enable HTTP transport (optional port, e.g. :8080)
@@ -201,6 +207,15 @@ pub enum Commands {
         /// Enable filesystem watcher
         #[arg(long)]
         watch: bool,
+        /// Also start the Hugo web UI for the selected wiki
+        #[arg(long)]
+        web: bool,
+        /// Web UI port when --web is enabled
+        #[arg(long, default_value_t = crate::web::DEFAULT_WEB_PORT)]
+        web_port: u16,
+        /// Web UI bind address when --web is enabled
+        #[arg(long, default_value = crate::web::DEFAULT_WEB_BIND)]
+        web_bind: String,
         /// Print what would be started, no server
         #[arg(long)]
         dry_run: bool,
@@ -232,6 +247,40 @@ pub enum LogsAction {
     List,
     /// Delete all log files
     Clear,
+}
+
+/// Subcommands for `llm-wiki web`.
+#[derive(Subcommand)]
+pub enum WebAction {
+    /// Install or refresh the embedded Hugo site scaffold
+    Install {
+        /// Overwrite existing site files
+        #[arg(long)]
+        force: bool,
+        /// Site title (default: wiki name)
+        #[arg(long)]
+        title: Option<String>,
+    },
+    /// Start Hugo development server for the selected wiki
+    Serve {
+        /// Port for the Hugo web UI
+        #[arg(long, default_value_t = crate::web::DEFAULT_WEB_PORT)]
+        port: u16,
+        /// Bind address for the Hugo web UI
+        #[arg(long, default_value = crate::web::DEFAULT_WEB_BIND)]
+        bind: String,
+        /// Include draft pages
+        #[arg(long)]
+        drafts: bool,
+    },
+    /// Build the static site into site/public
+    Build {
+        /// Minify generated output
+        #[arg(long)]
+        minify: bool,
+    },
+    /// Show web installation and Hugo availability
+    Status,
 }
 
 /// Subcommands for `llm-wiki spaces`.

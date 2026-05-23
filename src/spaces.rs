@@ -70,6 +70,7 @@ pub fn create(
     {
         if existing.name == name {
             ensure_structure(&path, name, description, wiki_root)?;
+            crate::web::install_hugo_site(&path, name, wiki_root, false)?;
             return Ok(CreateReport {
                 path: path.to_string_lossy().into(),
                 name: name.into(),
@@ -86,6 +87,7 @@ pub fn create(
     }
 
     ensure_structure(&path, name, description, wiki_root)?;
+    crate::web::install_hugo_site(&path, name, wiki_root, false)?;
 
     // Git init if not already a repo
     if !path.join(".git").exists() {
