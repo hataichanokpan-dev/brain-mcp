@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -64,10 +64,10 @@ jobs:
             tar czf ../../../${{ matrix.target }}.tar.gz llm-wiki
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: ${{ matrix.target }}.*
+          path: target/${{ matrix.target }}.*
 
   release:
     needs: build
@@ -76,7 +76,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
 
       - uses: softprops/action-gh-release@v3
         with:
@@ -84,31 +84,3 @@ jobs:
           files: |
             */*.tar.gz
             */*.zip
-
-  publish:
-    needs: release
-    if: ${{ !contains(github.ref, '-rc') }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.95"
-
-      - name: Publish to crates.io
-        run: cargo publish --locked --token ${{ secrets.CARGO_TOKEN }}
-
-  notify-tap:
-    needs: release
-    if: ${{ !contains(github.ref, '-rc') }}
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Trigger homebrew-tap update
-        run: |
-          gh api repos/geronimo-iia/homebrew-tap/dispatches \
-            -f event_type=update-llm-wiki
-        env:
-          GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}

@@ -73,11 +73,15 @@ detect_platform() {
 # ── Version ────────────────────────────────────────────────────────────────────
 
 get_latest_version() {
-    local url="https://api.github.com/repos/${REPO}/releases/latest"
-    VERSION=$(github_curl "$url" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+    local url response
+    url="https://api.github.com/repos/${REPO}/releases/latest"
+    if ! response=$(github_curl "$url"); then
+        VERSION=""
+        return 1
+    fi
+    VERSION=$(printf "%s" "$response" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
     if [ -z "$VERSION" ]; then
-        red "error: could not determine latest version"
-        exit 1
+        return 1
     fi
 }
 
@@ -103,6 +107,34 @@ install() {
     chmod +x "${tmpdir}/${BINARY}"
 
     install_executable "${tmpdir}/${BINARY}" "${BINARY}"
+}
+
+install_from_source() {
+    local tmpdir
+
+    if ! command -v cargo &>/dev/null; then
+        red "error: no GitHub release was found for ${REPO}, and cargo is not installed"
+        echo "Create a GitHub release, or install Rust first: https://www.rust-lang.org/tools/install"
+        exit 1
+    fi
+
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    yellow "warning: no GitHub release found for ${REPO}; building from source"
+    dim "  cloning https://github.com/${REPO}.git"
+    git clone --depth 1 "https://github.com/${REPO}.git" "${tmpdir}/src"
+
+    dim "  building release binary"
+    (cd "${tmpdir}/src" && cargo build --release --locked)
+
+    if [ ! -f "${tmpdir}/src/target/release/${BINARY}" ]; then
+        red "error: source build finished but binary was not found"
+        exit 1
+    fi
+
+    install_executable "${tmpdir}/src/target/release/${BINARY}" "${BINARY}"
+    VERSION="source"
 }
 
 install_executable() {
@@ -248,8 +280,11 @@ verify() {
 main() {
     check_prereqs
     detect_platform
-    get_latest_version
-    install
+    if get_latest_version; then
+        install
+    else
+        install_from_source
+    fi
     install_hugo
     verify
 }
