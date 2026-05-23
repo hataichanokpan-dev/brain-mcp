@@ -550,7 +550,7 @@ Schedule: รายสัปดาห์ (cron skill) + manual trigger ได้
 
 | Service | Resource | Port | Auto-restart |
 |---|---|---|---|
-| llm-wiki engine | ~300 MB RAM | 18765 (HTTP), stdio (ACP) | systemd |
+| llm-wiki engine | ~300 MB RAM | 47778 (HTTP), stdio (ACP) | systemd |
 | Qdrant | ~2 GB @ 10K vectors | 6333 (gRPC), 6334 (HTTP) | systemd |
 | Embedding service (FastEmbed/Infinity) | ~3 GB RAM | 8001 | systemd |
 | Reranker service | ~2 GB RAM | 8002 | systemd |

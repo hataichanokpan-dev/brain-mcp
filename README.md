@@ -241,19 +241,19 @@ llm-wiki serve --watch
 MCP over HTTP:
 
 ```bash
-llm-wiki serve --http :18765
+llm-wiki serve --http :47778
 ```
 
 HTTP endpoint:
 
 ```text
-http://127.0.0.1:18765/mcp
+http://127.0.0.1:47778/mcp
 ```
 
 ACP plus MCP HTTP:
 
 ```bash
-llm-wiki serve --acp --http :18765
+llm-wiki serve --acp --http :47778
 ```
 
 Why: ACP uses stdio. MCP stdio and ACP cannot share the same stdio stream, so when ACP is enabled, run MCP through HTTP.
@@ -423,7 +423,7 @@ Restart Claude Desktop after editing the config.
 For a remote host, run HTTP transport:
 
 ```bash
-llm-wiki serve --http :18765
+llm-wiki serve --http :47778
 ```
 
 Use a private network layer such as Tailscale or Cloudflare Tunnel. Do not expose this server directly to the public internet. The wiki stores private memory and source material.
@@ -431,7 +431,7 @@ Use a private network layer such as Tailscale or Cloudflare Tunnel. Do not expos
 Remote endpoint:
 
 ```text
-http://<host>:18765/mcp
+http://<host>:47778/mcp
 ```
 
 If a client only supports stdio MCP, run the server locally or use a stdio-to-HTTP bridge.
@@ -588,7 +588,7 @@ llm-wiki index rebuild --wiki brain
 Make sure you use `/mcp`:
 
 ```text
-http://127.0.0.1:18765/mcp
+http://127.0.0.1:47778/mcp
 ```
 
 ### ACP conflicts with MCP stdio
@@ -596,7 +596,7 @@ http://127.0.0.1:18765/mcp
 Use:
 
 ```bash
-llm-wiki serve --acp --http :18765
+llm-wiki serve --acp --http :47778
 ```
 
 Do not run `serve --acp` as a normal MCP stdio server.

@@ -78,14 +78,14 @@ exclusively available for ACP:
     "llm-wiki": {
       "type": "custom",
       "command": "llm-wiki",
-      "args": ["serve", "--acp", "--http", ":18765"],
+      "args": ["serve", "--acp", "--http", ":47778"],
       "env": {}
     }
   }
 }
 ```
 
-`--http :18765` starts the MCP server on HTTP, leaving stdio for ACP.
+`--http :47778` starts the MCP server on HTTP, leaving stdio for ACP.
 Running `serve --acp` without `--http` causes MCP and ACP to compete
 for the same stdio stream.
 
