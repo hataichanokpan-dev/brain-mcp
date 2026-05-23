@@ -186,6 +186,18 @@ fn default_acp_max_sessions() -> usize {
     20
 }
 
+fn default_mcp_session_keep_alive_secs() -> u64 {
+    21_600
+}
+
+fn default_mcp_init_timeout_secs() -> u64 {
+    60
+}
+
+fn default_mcp_completed_cache_ttl_secs() -> u64 {
+    60
+}
+
 /// `[serve]` section — HTTP and ACP server configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServeConfig {
@@ -213,6 +225,17 @@ pub struct ServeConfig {
     /// Maximum number of concurrent ACP sessions (default: 20). Rejects NewSession when reached.
     #[serde(default = "default_acp_max_sessions")]
     pub acp_max_sessions: usize,
+    /// Seconds before an idle MCP HTTP session is closed (default: 21600 / 6h).
+    /// Set to 0 to disable the idle timeout.
+    #[serde(default = "default_mcp_session_keep_alive_secs")]
+    pub mcp_session_keep_alive_secs: u64,
+    /// Seconds to wait for MCP HTTP initialize after session creation (default: 60).
+    /// Set to 0 to disable the initialize timeout.
+    #[serde(default = "default_mcp_init_timeout_secs")]
+    pub mcp_init_timeout_secs: u64,
+    /// Seconds to keep completed MCP request stream caches for late resume requests (default: 60).
+    #[serde(default = "default_mcp_completed_cache_ttl_secs")]
+    pub mcp_completed_cache_ttl_secs: u64,
 }
 
 impl Default for ServeConfig {
@@ -226,6 +249,9 @@ impl Default for ServeConfig {
             restart_backoff: 1,
             heartbeat_secs: 60,
             acp_max_sessions: default_acp_max_sessions(),
+            mcp_session_keep_alive_secs: default_mcp_session_keep_alive_secs(),
+            mcp_init_timeout_secs: default_mcp_init_timeout_secs(),
+            mcp_completed_cache_ttl_secs: default_mcp_completed_cache_ttl_secs(),
         }
     }
 }
@@ -768,6 +794,15 @@ pub fn set_global_config_value(global: &mut GlobalConfig, key: &str, value: &str
         "serve.restart_backoff" => global.serve.restart_backoff = value.parse()?,
         "serve.heartbeat_secs" => global.serve.heartbeat_secs = value.parse()?,
         "serve.acp_max_sessions" => global.serve.acp_max_sessions = value.parse()?,
+        "serve.mcp_session_keep_alive_secs" => {
+            global.serve.mcp_session_keep_alive_secs = value.parse()?;
+        }
+        "serve.mcp_init_timeout_secs" => {
+            global.serve.mcp_init_timeout_secs = value.parse()?;
+        }
+        "serve.mcp_completed_cache_ttl_secs" => {
+            global.serve.mcp_completed_cache_ttl_secs = value.parse()?;
+        }
         "ingest.auto_commit" => global.ingest.auto_commit = value.parse()?,
         "history.follow" => global.history.follow = value.parse()?,
         "history.default_limit" => global.history.default_limit = value.parse()?,
@@ -816,6 +851,11 @@ pub fn get_config_value(resolved: &ResolvedConfig, global: &GlobalConfig, key: &
         "serve.restart_backoff" => global.serve.restart_backoff.to_string(),
         "serve.heartbeat_secs" => global.serve.heartbeat_secs.to_string(),
         "serve.acp_max_sessions" => global.serve.acp_max_sessions.to_string(),
+        "serve.mcp_session_keep_alive_secs" => global.serve.mcp_session_keep_alive_secs.to_string(),
+        "serve.mcp_init_timeout_secs" => global.serve.mcp_init_timeout_secs.to_string(),
+        "serve.mcp_completed_cache_ttl_secs" => {
+            global.serve.mcp_completed_cache_ttl_secs.to_string()
+        }
         "validation.type_strictness" => resolved.validation.type_strictness.clone(),
         "logging.log_path" => global.logging.log_path.clone(),
         "logging.log_rotation" => global.logging.log_rotation.clone(),
@@ -979,6 +1019,9 @@ pub fn set_wiki_config_value(wiki_cfg: &mut WikiConfig, key: &str, value: &str) 
         | "serve.restart_backoff"
         | "serve.heartbeat_secs"
         | "serve.acp_max_sessions"
+        | "serve.mcp_session_keep_alive_secs"
+        | "serve.mcp_init_timeout_secs"
+        | "serve.mcp_completed_cache_ttl_secs"
         | "logging.log_path"
         | "logging.log_rotation"
         | "logging.log_max_files"

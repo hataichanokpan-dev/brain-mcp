@@ -38,9 +38,10 @@ fn from_embedded_schemas_has_fixed_fields() {
     fs::write(dir.path().join("wiki.toml"), "name = \"test\"\n").unwrap();
 
     let is = IndexSchema::build_from_schemas(dir.path(), "en_stem").unwrap();
-    for name in &["slug", "uri", "body", "body_links"] {
+    for name in &["slug", "uri", "type", "body", "body_links"] {
         assert!(is.try_field(name).is_some(), "missing fixed field: {name}");
     }
+    assert!(is.is_keyword("type"), "type must be exact-match keyword");
 }
 
 #[test]

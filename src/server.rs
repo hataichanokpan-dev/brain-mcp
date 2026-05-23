@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::Result;
 use rmcp::ServiceExt;
-use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
+use rmcp::transport::streamable_http_server::session::local::{LocalSessionManager, SessionConfig};
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
@@ -35,6 +36,23 @@ async fn serve_stdio(server: McpServer, mut shutdown: watch::Receiver<bool>) -> 
 
 // ── serve_http ────────────────────────────────────────────────────────────────
 
+fn optional_duration_from_secs(secs: u64) -> Option<Duration> {
+    if secs == 0 {
+        None
+    } else {
+        Some(Duration::from_secs(secs))
+    }
+}
+
+pub(crate) fn mcp_session_config(serve_cfg: &config::ServeConfig) -> SessionConfig {
+    let mut session_config = SessionConfig::default();
+    session_config.keep_alive = optional_duration_from_secs(serve_cfg.mcp_session_keep_alive_secs);
+    session_config.init_timeout = optional_duration_from_secs(serve_cfg.mcp_init_timeout_secs);
+    session_config.completed_cache_ttl =
+        Duration::from_secs(serve_cfg.mcp_completed_cache_ttl_secs);
+    session_config
+}
+
 async fn serve_http(
     server: McpServer,
     port: u16,
@@ -46,9 +64,31 @@ async fn serve_http(
     let config = StreamableHttpServerConfig::default()
         .with_cancellation_token(cancel.child_token())
         .with_allowed_hosts(serve_cfg.http_allowed_hosts.clone());
+    let session_config = mcp_session_config(serve_cfg);
 
-    let service: StreamableHttpService<McpServer, LocalSessionManager> =
-        StreamableHttpService::new(move || Ok(server.clone()), Default::default(), config);
+    tracing::info!(
+        keep_alive_secs = ?session_config.keep_alive.map(|d| d.as_secs()),
+        init_timeout_secs = ?session_config.init_timeout.map(|d| d.as_secs()),
+        completed_cache_ttl_secs = session_config.completed_cache_ttl.as_secs(),
+        "MCP HTTP session config",
+    );
+    if let Some(keep_alive) = session_config.keep_alive
+        && keep_alive < Duration::from_secs(600)
+    {
+        tracing::warn!(
+            keep_alive_secs = keep_alive.as_secs(),
+            "MCP HTTP session keep_alive is short; remote clients may need to reinitialize frequently",
+        );
+    }
+
+    let mut session_manager = LocalSessionManager::default();
+    session_manager.session_config = session_config;
+
+    let service: StreamableHttpService<McpServer, LocalSessionManager> = StreamableHttpService::new(
+        move || Ok(server.clone()),
+        Arc::new(session_manager),
+        config,
+    );
 
     let router = axum::Router::new().nest_service("/mcp", service);
 
@@ -232,4 +272,38 @@ pub async fn serve(
 
     tracing::info!("server stopped");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::config::ServeConfig;
+
+    use super::mcp_session_config;
+
+    #[test]
+    fn mcp_session_config_uses_long_default_keep_alive() {
+        let cfg = ServeConfig::default();
+        let session = mcp_session_config(&cfg);
+
+        assert_eq!(session.keep_alive, Some(Duration::from_secs(21_600)));
+        assert_eq!(session.init_timeout, Some(Duration::from_secs(60)));
+        assert_eq!(session.completed_cache_ttl, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn mcp_session_config_zero_disables_optional_timeouts() {
+        let cfg = ServeConfig {
+            mcp_session_keep_alive_secs: 0,
+            mcp_init_timeout_secs: 0,
+            mcp_completed_cache_ttl_secs: 5,
+            ..Default::default()
+        };
+        let session = mcp_session_config(&cfg);
+
+        assert_eq!(session.keep_alive, None);
+        assert_eq!(session.init_timeout, None);
+        assert_eq!(session.completed_cache_ttl, Duration::from_secs(5));
+    }
 }

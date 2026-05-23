@@ -138,6 +138,18 @@ All `serve.*` and `logging.*` keys are global-only. CLI flags override
 config per-invocation. See [global-config.md](../model/global-config.md)
 for the full key reference.
 
+### MCP HTTP session lifetime
+
+Streamable HTTP sessions are stateful when the server returns
+`Mcp-Session-Id` during initialization. The server keeps idle MCP HTTP
+sessions for `serve.mcp_session_keep_alive_secs` seconds; default is
+21600 (6 hours), which avoids normal IDE idle gaps causing reinitialization.
+
+Set `serve.mcp_session_keep_alive_secs = 0` to disable idle cleanup only for
+private single-user deployments. `serve.mcp_init_timeout_secs` controls how
+long a newly created HTTP session may wait for the initialize request, and
+`serve.mcp_completed_cache_ttl_secs` controls late resume cache retention.
+
 
 ## Logging
 

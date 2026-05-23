@@ -561,6 +561,17 @@ Claude Desktop uses stdio MCP by default and does not support the `url` field fo
 
 The `--allow-http` flag is required for non-HTTPS endpoints. For production use, place the server behind HTTPS (Tailscale, Cloudflare Tunnel, or a reverse proxy with TLS).
 
+For remote MCP clients that idle for long periods, keep the HTTP MCP session
+alive longer than the default work gap:
+
+```bash
+llm-wiki config set serve.mcp_session_keep_alive_secs 21600 --global
+```
+
+The default is 6 hours. If a bridge reports `Connection closed` after idle
+time, upgrade the server and raise this value rather than relying on manual
+client reinitialization.
+
 ## Common Workflows
 
 Search:

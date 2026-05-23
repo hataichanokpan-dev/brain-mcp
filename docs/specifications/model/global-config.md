@@ -179,6 +179,9 @@ is rejected.
 | `serve.restart_backoff` | `1`                | Initial backoff seconds; doubles, cap 30s |
 | `serve.heartbeat_secs`  | `60`               | Heartbeat interval; `0` = disabled        |
 | `serve.acp_max_sessions` | `20`              | Max concurrent ACP sessions; `NewSession` returns an error when reached |
+| `serve.mcp_session_keep_alive_secs` | `21600` | Idle MCP HTTP session lifetime; `0` = disabled |
+| `serve.mcp_init_timeout_secs` | `60` | Time allowed for MCP HTTP initialize after session creation; `0` = disabled |
+| `serve.mcp_completed_cache_ttl_secs` | `60` | Completed MCP request stream cache TTL for late resume requests |
 | `watch.debounce_ms`    | `500`              | Filesystem watcher debounce interval in ms |
 | `logging.log_path`      | `~/.llm-wiki/logs` | Log file directory; empty = stderr only   |
 | `logging.log_rotation`  | `daily`            | `daily`, `hourly`, `never`                |

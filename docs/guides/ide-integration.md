@@ -222,6 +222,20 @@ llm-wiki serve --http :8080
 
 Point the IDE at `http://localhost:8080/mcp` instead of stdio.
 
+### Remote session lifetime
+
+HTTP MCP clients initialize once and then reuse `Mcp-Session-Id`. The server
+keeps idle HTTP sessions for 6 hours by default:
+
+```bash
+llm-wiki config set serve.mcp_session_keep_alive_secs 21600 --global
+```
+
+If a remote bridge reports `Connection closed` after long idle periods, upgrade
+the server and raise this value before relying on manual client reinitialization.
+Set it to `0` only on private single-user servers where disabling idle cleanup is
+acceptable.
+
 ## Available Tools
 
 Tools are available via MCP. See

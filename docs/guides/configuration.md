@@ -241,6 +241,31 @@ llm-wiki config set serve.acp_max_sessions 5 --global
 This is a global-only key — it applies to the server process, not
 per-wiki.
 
+### Keep MCP HTTP sessions alive longer
+
+Streamable HTTP uses an MCP session ID after initialization. Some remote
+bridges, including `mcp-remote`, do not recover cleanly when a server-side
+session expires while the client is idle. The default keep-alive is 6 hours.
+Raise or lower it globally:
+
+```bash
+llm-wiki config set serve.mcp_session_keep_alive_secs 21600 --global
+```
+
+Set it to `0` only for private single-user deployments where disabling idle
+cleanup is acceptable:
+
+```bash
+llm-wiki config set serve.mcp_session_keep_alive_secs 0 --global
+```
+
+Related MCP HTTP session knobs:
+
+```bash
+llm-wiki config set serve.mcp_init_timeout_secs 60 --global
+llm-wiki config set serve.mcp_completed_cache_ttl_secs 60 --global
+```
+
 ### Configure logging
 
 For debugging `llm-wiki serve`:

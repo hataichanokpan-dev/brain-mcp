@@ -253,9 +253,15 @@ fn set_global_sets_serve_keys() {
     set_global_config_value(&mut g, "serve.max_restarts", "5").unwrap();
     set_global_config_value(&mut g, "serve.restart_backoff", "3").unwrap();
     set_global_config_value(&mut g, "serve.heartbeat_secs", "30").unwrap();
+    set_global_config_value(&mut g, "serve.mcp_session_keep_alive_secs", "7200").unwrap();
+    set_global_config_value(&mut g, "serve.mcp_init_timeout_secs", "45").unwrap();
+    set_global_config_value(&mut g, "serve.mcp_completed_cache_ttl_secs", "120").unwrap();
     assert_eq!(g.serve.max_restarts, 5);
     assert_eq!(g.serve.restart_backoff, 3);
     assert_eq!(g.serve.heartbeat_secs, 30);
+    assert_eq!(g.serve.mcp_session_keep_alive_secs, 7200);
+    assert_eq!(g.serve.mcp_init_timeout_secs, 45);
+    assert_eq!(g.serve.mcp_completed_cache_ttl_secs, 120);
 }
 
 #[test]
@@ -322,6 +328,9 @@ fn set_wiki_rejects_global_only_keys() {
         "serve.max_restarts",
         "serve.restart_backoff",
         "serve.heartbeat_secs",
+        "serve.mcp_session_keep_alive_secs",
+        "serve.mcp_init_timeout_secs",
+        "serve.mcp_completed_cache_ttl_secs",
         "index.auto_rebuild",
         "index.auto_recovery",
         "index.memory_budget_mb",
@@ -380,6 +389,9 @@ fn serve_config_defaults() {
     assert_eq!(cfg.max_restarts, 10);
     assert_eq!(cfg.restart_backoff, 1);
     assert_eq!(cfg.heartbeat_secs, 60);
+    assert_eq!(cfg.mcp_session_keep_alive_secs, 21_600);
+    assert_eq!(cfg.mcp_init_timeout_secs, 60);
+    assert_eq!(cfg.mcp_completed_cache_ttl_secs, 60);
 }
 
 #[test]
@@ -421,6 +433,9 @@ fn get_config_value_reads_global_only_keys() {
         },
         serve: ServeConfig {
             http_port: 9090,
+            mcp_session_keep_alive_secs: 7200,
+            mcp_init_timeout_secs: 45,
+            mcp_completed_cache_ttl_secs: 120,
             ..Default::default()
         },
         logging: LoggingConfig {
@@ -442,6 +457,18 @@ fn get_config_value_reads_global_only_keys() {
     assert_eq!(
         get_config_value(&resolved, &global, "serve.http_port"),
         "9090"
+    );
+    assert_eq!(
+        get_config_value(&resolved, &global, "serve.mcp_session_keep_alive_secs"),
+        "7200"
+    );
+    assert_eq!(
+        get_config_value(&resolved, &global, "serve.mcp_init_timeout_secs"),
+        "45"
+    );
+    assert_eq!(
+        get_config_value(&resolved, &global, "serve.mcp_completed_cache_ttl_secs"),
+        "120"
     );
     assert_eq!(
         get_config_value(&resolved, &global, "logging.log_format"),
