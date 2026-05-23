@@ -44,7 +44,7 @@ impl IndexSchema {
         // Collect and classify fields from all schemas
         let mut seen: HashSet<String> = HashSet::new();
         // Fixed fields are already added
-        for name in &["slug", "uri", "body", "body_links"] {
+        for name in &["slug", "uri", "type", "body", "body_links"] {
             seen.insert(name.to_string());
         }
 
@@ -271,6 +271,9 @@ impl SchemaBuilder {
         self.keyword_fields.insert("slug".to_string());
 
         self.add_keyword("uri");
+        // type is always categorical and used for exact-match filtering (TermQuery),
+        // so it must be a keyword regardless of how individual schemas define it
+        self.add_keyword("type");
         self.add_text("body");
         self.add_keyword("body_links");
     }

@@ -145,7 +145,7 @@ fn assemble(
     let mut types = HashMap::new();
     let mut schema_builder = SchemaBuilder::new(tokenizer);
     schema_builder.add_fixed_fields();
-    let mut seen_fields: HashSet<String> = ["slug", "uri", "body", "body_links"]
+    let mut seen_fields: HashSet<String> = ["slug", "uri", "type", "body", "body_links"]
         .iter()
         .map(|s| s.to_string())
         .collect();
@@ -220,7 +220,7 @@ fn assemble_without_overrides(
     let mut types = HashMap::new();
     let mut schema_builder = SchemaBuilder::new(tokenizer);
     schema_builder.add_fixed_fields();
-    let mut seen_fields: HashSet<String> = ["slug", "uri", "body", "body_links"]
+    let mut seen_fields: HashSet<String> = ["slug", "uri", "type", "body", "body_links"]
         .iter()
         .map(|s| s.to_string())
         .collect();

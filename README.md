@@ -479,7 +479,87 @@ Remote endpoint:
 http://<host>:47778/mcp
 ```
 
-If a client only supports stdio MCP, run the server locally or use a stdio-to-HTTP bridge.
+### Allow Remote Host Headers
+
+By default, the HTTP server only allows requests with `Host: localhost` (DNS rebinding protection). To accept connections from remote clients, add the server's public IP or hostname to the allowed hosts list:
+
+```bash
+llm-wiki config set --global serve.http_allowed_hosts "localhost,127.0.0.1,::1,<your-public-ip>"
+```
+
+Restart the server after changing this setting.
+
+### Systemd Service (Linux)
+
+To keep the server running across reboots:
+
+**MCP server only:**
+
+```bash
+printf '[Unit]\nDescription=Brain MCP Server\nAfter=network.target\n\n[Service]\nType=simple\nUser=opc\nExecStart=/usr/local/bin/llm-wiki serve --http :47778 --watch\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' | sudo tee /etc/systemd/system/brain-mcp.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now brain-mcp
+sudo systemctl status brain-mcp
+```
+
+**MCP server + Web UI (combined):**
+
+```bash
+printf '[Unit]\nDescription=Brain MCP Server + Web UI\nAfter=network.target\n\n[Service]\nType=simple\nUser=opc\nExecStart=/usr/local/bin/llm-wiki serve --http :47778 --watch --web --web-port 1414 --web-bind 0.0.0.0\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' | sudo tee /etc/systemd/system/brain-mcp.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now brain-mcp
+sudo systemctl status brain-mcp
+```
+
+Prerequisites for the Web UI variant: Hugo Extended must be installed. Run `llm-wiki web install --wiki brain` first and verify with `llm-wiki web status --wiki brain`.
+
+If you get `Permission denied` (status 203/EXEC), ensure the binary is executable:
+
+```bash
+sudo chmod +x /usr/local/bin/llm-wiki
+sudo systemctl restart brain-mcp
+```
+
+### Firewall
+
+On Oracle Linux / RHEL / CentOS with `firewalld`:
+
+```bash
+# MCP server
+sudo firewall-cmd --add-port=47778/tcp --permanent
+# Web UI (only needed for the combined service variant)
+sudo firewall-cmd --add-port=1414/tcp --permanent
+sudo firewall-cmd --reload
+```
+
+With raw `iptables`:
+
+```bash
+sudo iptables -I INPUT -p tcp --dport 47778 -j ACCEPT
+# Web UI
+sudo iptables -I INPUT -p tcp --dport 1414 -j ACCEPT
+```
+
+Also open the port in your cloud provider's security group / security list (e.g., OCI Security List Ingress Rule for TCP 47778).
+
+### Connect Claude Desktop to Remote Server
+
+Claude Desktop uses stdio MCP by default and does not support the `url` field for remote servers. Use `mcp-remote` as a stdio-to-HTTP bridge:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://<host>:47778/mcp", "--allow-http"]
+    }
+  }
+}
+```
+
+The `--allow-http` flag is required for non-HTTPS endpoints. For production use, place the server behind HTTPS (Tailscale, Cloudflare Tunnel, or a reverse proxy with TLS).
 
 ## Common Workflows
 
