@@ -21,6 +21,22 @@
     {{ .Content }}
   </div>
 
+  {{ if .File }}
+    {{ $children := where .Site.RegularPages "File.Dir" .File.Dir }}
+    {{ $children = where $children "Permalink" "!=" .Permalink }}
+    {{ $children = where $children "Params.status" "!=" "archived" }}
+    {{ if gt (len $children) 0 }}
+    <section class="child-pages">
+      <h2>Pages In This Folder</h2>
+      <ul class="page-list">
+        {{ range $children.ByTitle }}
+          {{ partial "page-list-item.html" . }}
+        {{ end }}
+      </ul>
+    </section>
+    {{ end }}
+  {{ end }}
+
   {{ if or .Params.sources .Params.concepts }}
   <section class="related-pages">
     <h2>Related</h2>

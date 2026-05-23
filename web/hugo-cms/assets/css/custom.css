@@ -179,6 +179,11 @@ a:hover { text-decoration: underline; }
 .type-count { color: #888; font-weight: normal; font-size: 0.9rem; }
 
 .type-group { margin-bottom: 1.5rem; }
+.type-group.compact { margin-bottom: 1rem; }
+.type-group.compact .type-heading {
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
 
 .page-list { list-style: none; padding: 0; margin: 0; }
 .page-item {
@@ -194,6 +199,16 @@ a:hover { text-decoration: underline; }
 .page-summary { color: #555; font-size: 0.88rem; flex: 1; }
 .page-meta { display: flex; gap: 0.3rem; align-items: center; }
 .confidence { color: #888; font-size: 0.78rem; }
+
+.child-pages {
+  margin-top: 2rem;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 1.25rem;
+}
+.child-pages h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
 
 /* ── Mermaid ───────────────────────────────────────────────── */
 .mermaid { margin: 1.5rem 0; overflow-x: auto; }

@@ -104,6 +104,44 @@ fn rebuild_report_fields() {
     assert!(report.duration_ms < 10_000);
 }
 
+#[test]
+fn rebuild_recreates_index_when_existing_schema_is_incompatible() {
+    let dir = tempfile::tempdir().unwrap();
+    let wiki_root = setup_repo(dir.path());
+    write_page(&wiki_root, "concepts/foo.md", &concept_page("Foo", "body"));
+    git::commit(dir.path(), "pages").unwrap();
+
+    let mgr = make_manager(dir.path());
+    let search_dir = mgr.index_path().join("search-index");
+    fs::create_dir_all(&search_dir).unwrap();
+
+    let mut old_builder = tantivy::schema::Schema::builder();
+    old_builder.add_text_field("slug", tantivy::schema::TEXT | tantivy::schema::STORED);
+    old_builder.add_text_field("uri", tantivy::schema::TEXT | tantivy::schema::STORED);
+    old_builder.add_text_field("type", tantivy::schema::TEXT | tantivy::schema::STORED);
+    old_builder.add_text_field("body", tantivy::schema::TEXT | tantivy::schema::STORED);
+    old_builder.add_text_field(
+        "body_links",
+        tantivy::schema::TEXT | tantivy::schema::STORED,
+    );
+    let old_dir = tantivy::directory::MmapDirectory::open(&search_dir).unwrap();
+    tantivy::Index::create(
+        old_dir,
+        old_builder.build(),
+        tantivy::IndexSettings::default(),
+    )
+    .unwrap();
+
+    let is = schema();
+    let report = mgr
+        .rebuild(&wiki_root, dir.path(), &is, &registry())
+        .unwrap();
+
+    assert_eq!(report.pages_indexed, 1);
+    assert!(is.is_keyword("type"));
+    assert!(mgr.status(dir.path()).unwrap().queryable);
+}
+
 // ── status ────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -352,11 +390,16 @@ fn open_recovers_from_corruption() {
     let wiki_root = setup_repo(dir.path());
     write_page(&wiki_root, "concepts/foo.md", &concept_page("Foo", "body"));
 
-    let mgr = make_manager(dir.path());
     git::commit(dir.path(), "pages").unwrap();
     let is = schema();
     let reg = registry();
-    mgr.rebuild(&wiki_root, dir.path(), &is, &reg).unwrap();
+    {
+        let build_mgr = make_manager(dir.path());
+        build_mgr
+            .rebuild(&wiki_root, dir.path(), &is, &reg)
+            .unwrap();
+    }
+    let mgr = make_manager(dir.path());
 
     // Corrupt the index files
     let search_dir = mgr.index_path().join("search-index");
@@ -379,10 +422,14 @@ fn open_fails_without_recovery_on_corruption() {
     let wiki_root = setup_repo(dir.path());
     write_page(&wiki_root, "concepts/foo.md", &concept_page("Foo", "body"));
 
-    let mgr = make_manager(dir.path());
     git::commit(dir.path(), "pages").unwrap();
-    mgr.rebuild(&wiki_root, dir.path(), &schema(), &registry())
-        .unwrap();
+    {
+        let build_mgr = make_manager(dir.path());
+        build_mgr
+            .rebuild(&wiki_root, dir.path(), &schema(), &registry())
+            .unwrap();
+    }
+    let mgr = make_manager(dir.path());
 
     // Corrupt the index files
     let search_dir = mgr.index_path().join("search-index");

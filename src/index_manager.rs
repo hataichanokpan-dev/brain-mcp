@@ -7,8 +7,8 @@ use chrono::Utc;
 use git2::Delta;
 use serde::{Deserialize, Serialize};
 use tantivy::{
-    Index, IndexReader, IndexWriter, Searcher, Term, collector::TopDocs, directory::MmapDirectory,
-    query::AllQuery,
+    Index, IndexReader, IndexSettings, IndexWriter, Searcher, Term, collector::TopDocs,
+    directory::MmapDirectory, query::AllQuery,
 };
 use walkdir::WalkDir;
 
@@ -263,12 +263,26 @@ impl SpaceIndexManager {
         let start = std::time::Instant::now();
 
         let search_dir = self.index_path.join("search-index");
+        {
+            let mut inner = self
+                .inner
+                .write()
+                .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+            inner.tantivy_index = None;
+            inner.index_reader = None;
+        }
+        if search_dir.exists() {
+            std::fs::remove_dir_all(&search_dir).with_context(|| {
+                format!("failed to remove old index dir: {}", search_dir.display())
+            })?;
+        }
         std::fs::create_dir_all(&search_dir)?;
 
-        // Always open_or_create for rebuild (schema may have changed)
+        // Full rebuild must recreate the directory because Tantivy cannot
+        // open_or_create over an existing index with an incompatible schema.
         let dir = MmapDirectory::open(&search_dir)
             .with_context(|| format!("failed to open index dir: {}", search_dir.display()))?;
-        let index = Index::open_or_create(dir, is.schema.clone())?;
+        let index = Index::create(dir, is.schema.clone(), IndexSettings::default())?;
         let mut writer: IndexWriter = index.writer(50_000_000)?;
         writer.delete_all_documents()?;
 
@@ -311,7 +325,21 @@ impl SpaceIndexManager {
         }
 
         writer.commit()?;
-        self.reload_reader()?;
+        drop(writer);
+
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()?;
+        {
+            let mut inner = self
+                .inner
+                .write()
+                .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+            inner.tantivy_index = Some(index);
+            inner.index_reader = Some(reader);
+            inner.generation.fetch_add(1, Ordering::AcqRel);
+        }
 
         let commit = git::current_head(repo_root).unwrap_or_default();
         let state = IndexState {

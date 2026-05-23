@@ -17,5 +17,26 @@
     </ul>
   </div>
   {{ end }}
+
+  {{ $allPages := where .Site.RegularPages "Params.status" "!=" "archived" }}
+  {{ if gt (len $allPages) 0 }}
+  <div class="home-section">
+    <h2>All Pages</h2>
+    {{ $byType := $allPages.GroupByParam "type" }}
+    {{ range $byType }}
+    <div class="type-group compact">
+      <h3 class="type-heading">
+        <span class="type-badge type-{{ .Key | urlize }}">{{ .Key | default "other" }}</span>
+        <span class="type-count">({{ len .Pages }})</span>
+      </h3>
+      <ul class="page-list">
+        {{ range .Pages.ByTitle }}
+        {{ partial "page-list-item.html" . }}
+        {{ end }}
+      </ul>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
 </section>
 {{ end }}

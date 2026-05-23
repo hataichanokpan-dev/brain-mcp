@@ -91,7 +91,6 @@ install() {
     local url="https://github.com/${REPO}/releases/download/v${VERSION}/${TARGET}.tar.gz"
     local tmpdir
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
 
     echo "Installing ${BINARY} v${VERSION} (${TARGET})"
     dim "  downloading ${url}"
@@ -107,6 +106,7 @@ install() {
     chmod +x "${tmpdir}/${BINARY}"
 
     install_executable "${tmpdir}/${BINARY}" "${BINARY}"
+    rm -rf "$tmpdir"
 }
 
 install_from_source() {
@@ -119,7 +119,6 @@ install_from_source() {
     fi
 
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
 
     yellow "warning: no GitHub release found for ${REPO}; building from source"
     dim "  cloning https://github.com/${REPO}.git"
@@ -134,6 +133,7 @@ install_from_source() {
     fi
 
     install_executable "${tmpdir}/src/target/release/${BINARY}" "${BINARY}"
+    rm -rf "$tmpdir"
     VERSION="source"
 }
 
