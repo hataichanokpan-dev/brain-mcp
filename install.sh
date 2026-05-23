@@ -140,6 +140,7 @@ install_from_source() {
 install_executable() {
     local src="$1"
     local name="$2"
+    local dest="${INSTALL_DIR}/${name}"
 
     if [ ! -d "$INSTALL_DIR" ]; then
         if mkdir -p "$INSTALL_DIR" 2>/dev/null; then
@@ -151,10 +152,18 @@ install_executable() {
     fi
 
     if [ -w "$INSTALL_DIR" ]; then
-        mv "$src" "${INSTALL_DIR}/${name}"
+        install -m 0755 "$src" "$dest"
     else
         dim "  installing to ${INSTALL_DIR} (requires sudo)"
-        sudo mv "$src" "${INSTALL_DIR}/${name}"
+        sudo install -m 0755 "$src" "$dest"
+    fi
+
+    if command -v restorecon >/dev/null 2>&1; then
+        if [ -w "$dest" ]; then
+            restorecon "$dest" 2>/dev/null || true
+        else
+            sudo restorecon "$dest" 2>/dev/null || true
+        fi
     fi
 }
 

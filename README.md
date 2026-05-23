@@ -568,11 +568,28 @@ sudo systemctl status brain-mcp
 
 Prerequisites for the Web UI variant: Hugo Extended must be installed. Run `llm-wiki web install --wiki brain` first and verify with `llm-wiki web status --wiki brain`.
 
-If you get `Permission denied` (status 203/EXEC), ensure the binary is executable:
+If systemd shows `status=203/EXEC`, the process failed before `llm-wiki` started. Check that systemd is executing the same binary you tested manually:
 
 ```bash
+command -v llm-wiki
+/usr/local/bin/llm-wiki --version
+ls -l /usr/local/bin/llm-wiki
+file /usr/local/bin/llm-wiki
+
 sudo chmod +x /usr/local/bin/llm-wiki
+sudo systemctl daemon-reload
 sudo systemctl restart brain-mcp
+sudo systemctl status brain-mcp --no-pager
+```
+
+On Oracle Linux, RHEL, CentOS, or any SELinux-enabled host, also verify the SELinux context. A binary moved from a temp directory can keep a non-executable label for systemd:
+
+```bash
+getenforce
+ls -lZ /usr/local/bin/llm-wiki
+sudo restorecon -v /usr/local/bin/llm-wiki
+sudo systemctl restart brain-mcp
+journalctl -u brain-mcp -n 80 --no-pager
 ```
 
 ### Firewall
