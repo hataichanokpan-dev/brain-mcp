@@ -104,6 +104,59 @@ macOS/Linux:
 ./target/release/llm-wiki --version
 ```
 
+## Update Existing Install
+
+Check the version currently installed:
+
+```bash
+llm-wiki --version
+```
+
+If a new GitHub Release is published, update with the installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
+```
+
+Then rebuild the index and refresh the embedded web scaffold:
+
+```bash
+llm-wiki --version
+llm-wiki index rebuild --wiki brain
+llm-wiki web install --wiki brain --force
+sudo systemctl restart brain-mcp
+sudo systemctl status brain-mcp --no-pager
+```
+
+Important: `install.sh` installs the latest published GitHub Release. If a tag
+was pushed but the Release workflow is still building, the installer will keep
+installing the previous release until the new release assets are published.
+
+To update immediately from `main` before release assets are ready:
+
+```bash
+sudo systemctl stop brain-mcp
+
+tmpdir=$(mktemp -d)
+git clone https://github.com/hataichanokpan-dev/brain-mcp.git "$tmpdir/brain-mcp"
+cd "$tmpdir/brain-mcp"
+
+cargo build --release --locked
+sudo install -m 0755 target/release/llm-wiki /usr/local/bin/llm-wiki
+
+llm-wiki --version
+llm-wiki index rebuild --wiki brain
+llm-wiki web install --wiki brain --force
+
+sudo systemctl start brain-mcp
+sudo systemctl status brain-mcp --no-pager
+```
+
+If the update includes schema or index behavior changes, always run
+`llm-wiki index rebuild --wiki brain`. If the update changes the embedded Hugo
+web UI, run `llm-wiki web install --wiki brain --force` before restarting the
+combined MCP + Web UI service.
+
 ## Create Your Brain Wiki
 
 Create a wiki repository. This is where the actual memory lives:
