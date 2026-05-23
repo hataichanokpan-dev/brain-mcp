@@ -4,18 +4,14 @@
 
 | Channel          | Command                                  | Notes               |
 | ---------------- | ---------------------------------------- | ------------------- |
-| Source build     | `cargo install llm-wiki-engine`          | Always available    |
-| Pre-built binary | `cargo binstall llm-wiki`                | Via GitHub releases |
-| Homebrew         | `brew install geronimo-iia/tap/llm-wiki` | macOS/Linux         |
-| asdf             | `asdf install llm-wiki latest`           | Version manager     |
+| Source build     | `cargo install --path .`                 | Always available    |
+| Pre-built binary | `install.sh` / `install.ps1`             | Via GitHub releases |
 
 ### Repositories
 
 | Repo                                                           | Purpose            |
 | -------------------------------------------------------------- | ------------------ |
-| [llm-wiki](https://github.com/geronimo-iia/llm-wiki)           | Engine source + CI |
-| [homebrew-tap](https://github.com/geronimo-iia/homebrew-tap)   | Homebrew formula   |
-| [asdf-llm-wiki](https://github.com/geronimo-iia/asdf-llm-wiki) | asdf plugin        |
+| [brain-mcp](https://github.com/hataichanokpan-dev/brain-mcp)   | Engine source + CI |
 
 ## Branch Strategy
 
@@ -93,30 +89,13 @@ Tags containing `-rc` (e.g. `v0.3.0-rc1`) follow the same steps but:
 - GitHub release is marked **pre-release** (not shown as latest)
 - `publish` job is **skipped** — nothing sent to crates.io
 
-Install an RC binary directly:
-
-```bash
-cargo binstall llm-wiki@0.3.0-rc1   # reads GitHub releases
-```
-
-Or download the tarball manually from the GitHub releases page and put
-`llm-wiki` on your `PATH`.
+Install an RC binary by downloading the tarball manually from the GitHub
+release page and putting `llm-wiki` on your `PATH`.
 
 ## Post-Release
 
-### Homebrew formula
-
-Update `homebrew-tap/Formula/llm-wiki.rb`:
-- Version, URL, SHA256 for each platform
-- Commit: `chore: bump llm-wiki to x.y.z`
-- Test: `brew install geronimo-iia/tap/llm-wiki`
-
-### asdf plugin
-
-Test: `asdf install llm-wiki <version>`
-
-The plugin reads releases from GitHub — no update needed unless the
-binary naming changes.
+Homebrew/asdf channels are not published for `brain-mcp` yet. If added later,
+document the tap/plugin repository here before advertising those install paths.
 
 ## Hotfix
 

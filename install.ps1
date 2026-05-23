@@ -1,9 +1,20 @@
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
 
-$Repo = "geronimo-iia/llm-wiki"
+$Repo = if ($env:LLM_WIKI_RELEASE_REPO) { $env:LLM_WIKI_RELEASE_REPO } else { "hataichanokpan-dev/brain-mcp" }
 $Binary = "llm-wiki"
 $InstallDir = if ($env:LLM_WIKI_INSTALL_DIR) { $env:LLM_WIKI_INSTALL_DIR } else { "$env:USERPROFILE\.llm-wiki\bin" }
+$GithubToken = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { $env:GH_TOKEN }
+
+function Get-GitHubHeaders {
+    if ($GithubToken) {
+        return @{
+            Authorization = "Bearer $GithubToken"
+            Accept = "application/vnd.github+json"
+        }
+    }
+    return @{}
+}
 
 # ── Prerequisites ──────────────────────────────────────────────────────────────
 
@@ -23,7 +34,7 @@ function Get-Target {
         "X64"   { return "x86_64-pc-windows-msvc" }
         "Arm64" { 
             Write-Host "error: Windows ARM64 binaries are not available" -ForegroundColor Red
-            Write-Host "Use 'cargo install llm-wiki-engine' instead"
+            Write-Host "Build from source instead: git clone https://github.com/hataichanokpan-dev/brain-mcp; cd brain-mcp; cargo install --path ."
             exit 1
         }
         default {
@@ -37,7 +48,7 @@ function Get-Target {
 
 function Get-LatestVersion {
     $url = "https://api.github.com/repos/$Repo/releases/latest"
-    $release = Invoke-RestMethod -Uri $url -UseBasicParsing
+    $release = Invoke-RestMethod -Uri $url -UseBasicParsing -Headers (Get-GitHubHeaders)
     $version = $release.tag_name -replace '^v', ''
     if (-not $version) {
         Write-Host "error: could not determine latest version" -ForegroundColor Red
@@ -61,7 +72,7 @@ function Install-Binary {
     Write-Host "  downloading $url" -ForegroundColor DarkGray
 
     $zipPath = Join-Path $tmpDir "archive.zip"
-    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing -Headers (Get-GitHubHeaders)
 
     Expand-Archive -Path $zipPath -DestinationPath $tmpDir -Force
 

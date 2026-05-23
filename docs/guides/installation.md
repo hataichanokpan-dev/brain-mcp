@@ -5,22 +5,33 @@
 macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/geronimo-iia/llm-wiki/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 ```
+
+For a private repository, run the script from a local clone or export
+`GITHUB_TOKEN`/`GH_TOKEN` before running it so release lookup and downloads can
+authenticate.
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/geronimo-iia/llm-wiki/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.ps1 | iex
 ```
 
 The scripts detect your platform, download the latest binary from
-GitHub releases, install it, and verify `git` is available.
+GitHub releases, install it, verify `git` is available, and try to install
+Hugo Extended for the bundled web UI.
 
 Custom install directory:
 
 ```bash
-LLM_WIKI_INSTALL_DIR=~/.local/bin curl -fsSL .../install.sh | bash
+LLM_WIKI_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
+```
+
+Skip automatic Hugo installation:
+
+```bash
+LLM_WIKI_INSTALL_HUGO=0 curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 ```
 
 ## From Source (cargo)
@@ -28,38 +39,29 @@ LLM_WIKI_INSTALL_DIR=~/.local/bin curl -fsSL .../install.sh | bash
 Requires [Rust](https://www.rust-lang.org/tools/install) 1.95+.
 
 ```bash
-cargo install llm-wiki-engine
+git clone https://github.com/hataichanokpan-dev/brain-mcp.git
+cd brain-mcp
+cargo install --path .
 ```
 
-## Pre-built Binary (cargo-binstall)
+## Pre-built Binary
 
-Requires [cargo-binstall](https://github.com/cargo-bins/cargo-binstall).
-
-```bash
-cargo binstall llm-wiki
-```
-
-Downloads a pre-built binary from GitHub releases — no compilation.
+Use `install.sh`, `install.ps1`, or download from this repository's GitHub
+releases manually. Do not use the upstream `llm-wiki` Homebrew/asdf channels
+for this fork.
 
 ## Homebrew (macOS / Linux)
 
-```bash
-brew tap geronimo-iia/tap
-brew install llm-wiki
-```
+Not published for `brain-mcp` yet. Use `install.sh` or the source install above.
 
 ## asdf Version Manager
 
-```bash
-asdf plugin add llm-wiki https://github.com/geronimo-iia/asdf-llm-wiki.git
-asdf install llm-wiki latest
-asdf global llm-wiki latest
-```
+Not published for `brain-mcp` yet. Use `install.sh` or the source install above.
 
 ## Manual Download·
 
 Download a binary from the
-[GitHub releases](https://github.com/geronimo-iia/llm-wiki/releases)
+[GitHub releases](https://github.com/hataichanokpan-dev/brain-mcp/releases)
 page. Available targets:
 
 | Platform            | Archive                            |
@@ -72,7 +74,7 @@ page. Available targets:
 
 ```bash
 # Example: macOS Apple Silicon
-curl -LO https://github.com/geronimo-iia/llm-wiki/releases/latest/download/aarch64-apple-darwin.tar.gz
+curl -LO https://github.com/hataichanokpan-dev/brain-mcp/releases/latest/download/aarch64-apple-darwin.tar.gz
 tar xzf aarch64-apple-darwin.tar.gz
 sudo mv llm-wiki /usr/local/bin/
 ```
@@ -88,5 +90,6 @@ llm-wiki --version
 - `git` — required for wiki repositories (commit, diff, history)
 - No required runtime dependencies — llm-wiki is a single static binary
 - Optional web UI: [Hugo Extended](https://gohugo.io/installation/) 0.147+.
-  The binary can install the `site/` scaffold without Hugo, but `llm-wiki web serve`
-  and `llm-wiki web build` need `hugo` on `PATH`.
+  `install.sh` attempts to install it automatically. The binary can still
+  install the `site/` scaffold without Hugo, but `llm-wiki web serve` and
+  `llm-wiki web build` need `hugo` on `PATH`.

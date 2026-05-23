@@ -63,7 +63,7 @@ Important: `semantic_search` currently maps to the existing BM25 search. Hybrid 
 - Rust 1.95+
 - Git
 - Windows, macOS, or Linux
-- Optional web UI: Hugo Extended 0.147+
+- Optional web UI: Hugo Extended 0.147+ (`install.sh` attempts to install it automatically)
 - For integration tests: Python 3.11+ and `uv`
 
 This repo includes `rust-toolchain.toml`, so `cargo` will use Rust 1.95 automatically when available.

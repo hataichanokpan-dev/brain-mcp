@@ -418,7 +418,7 @@ do domain work. Both coexist. A wiki skill can extend a plugin skill.
 
 | Repository                                                             | What it is                                         | Language            |
 | ---------------------------------------------------------------------- | -------------------------------------------------- | ------------------- |
-| [llm-wiki](https://github.com/geronimo-iia/llm-wiki)                   | Wiki engine — 19 MCP tools, tantivy, git, petgraph | Rust                |
+| [brain-mcp](https://github.com/hataichanokpan-dev/brain-mcp)           | Wiki engine — MCP tools, tantivy, git, petgraph    | Rust                |
 | [llm-wiki-skills](https://github.com/geronimo-iia/llm-wiki-skills)     | Claude Code plugin — 8 skills for the engine       | Markdown (SKILL.md) |
 | [llm-wiki-hugo-cms](https://github.com/geronimo-iia/llm-wiki-hugo-cms) | Hugo site scaffold — render wiki as a website      | Hugo + HTML         |
 

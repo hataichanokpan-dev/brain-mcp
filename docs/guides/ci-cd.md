@@ -8,11 +8,11 @@ any CI environment that has `git`.
 ```yaml
 # GitHub Actions
 - name: Install llm-wiki
-  run: cargo binstall llm-wiki --no-confirm
+  run: curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 
-# Or from source (slower, no cargo-binstall needed)
+# Or from source (slower)
 - name: Install llm-wiki
-  run: cargo install llm-wiki-engine --locked
+  run: git clone https://github.com/hataichanokpan-dev/brain-mcp /tmp/brain-mcp && cargo install --path /tmp/brain-mcp
 ```
 
 ## Schema Validation on PR
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install llm-wiki
-        run: cargo binstall llm-wiki --no-confirm
+        run: curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 
       - name: Register wiki
         run: llm-wiki spaces create . --name ci
@@ -77,7 +77,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install llm-wiki
-        run: cargo binstall llm-wiki --no-confirm
+        run: curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 
       - name: Register wiki
         run: llm-wiki spaces create . --name ci
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install llm-wiki
-        run: cargo binstall llm-wiki --no-confirm
+        run: curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 
       - name: Register wiki
         run: llm-wiki spaces create . --name ci

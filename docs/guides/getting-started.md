@@ -7,10 +7,15 @@ searchable pages and a concept graph.
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/geronimo-iia/llm-wiki/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hataichanokpan-dev/brain-mcp/main/install.sh | bash
 
-# Or via cargo
-cargo install llm-wiki-engine
+# Private repo/local clone
+./install.sh
+
+# Or via cargo from this repository
+git clone https://github.com/hataichanokpan-dev/brain-mcp.git
+cd brain-mcp
+cargo install --path .
 ```
 
 Verify:
