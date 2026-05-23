@@ -67,14 +67,15 @@ impl TryFrom<&str> for Slug {
     type Error = anyhow::Error;
 
     fn try_from(s: &str) -> Result<Self> {
-        let s = s.trim();
+        let normalized = s.trim().replace('\\', "/");
+        let s = normalized.as_str();
         if s.is_empty() {
             bail!("slug cannot be empty");
         }
         if s.starts_with('/') {
             bail!("slug cannot start with /: {s}");
         }
-        if s.contains("../") || s.contains("..\\") {
+        if s.contains("../") {
             bail!("slug cannot contain path traversal: {s}");
         }
         // Reject if the last segment has a file extension

@@ -38,7 +38,7 @@ fn opt_int(desc: &str) -> Value {
     json!({"type": "integer", "description": desc})
 }
 
-// ── Tool definitions (22 tools) ───────────────────────────────────────────────
+// ── Tool definitions ─────────────────────────────────────────────────────────
 
 /// Return the complete list of MCP tool definitions for registration.
 pub fn tool_list() -> Vec<Tool> {
@@ -339,6 +339,93 @@ pub fn tool_list() -> Vec<Tool> {
                 &["action"],
             ),
         ),
+        Tool::new(
+            "profile_get",
+            "Read active operator profile pages, optionally scoped to one section",
+            schema(
+                json!({
+                    "section": opt_str("Profile section: rules | identity | style | stack | constraints"),
+                    "wiki": opt_str("Target wiki name"),
+                }),
+                &[],
+            ),
+        ),
+        Tool::new(
+            "semantic_search",
+            "Blueprint read-tier alias for BM25 semantic wiki search. Vector/rerank is not enabled yet.",
+            schema(
+                json!({
+                    "query": str_prop("Search query"),
+                    "top_k": opt_int("Max results"),
+                    "type": opt_str("Optional semantic type filter: concept | entity | source | project | decision"),
+                    "wiki": opt_str("Target wiki name"),
+                    "format": opt_str("Output format: json | llms (default: json)"),
+                }),
+                &["query"],
+            ),
+        ),
+        Tool::new(
+            "semantic_get",
+            "Read a semantic page by page_id or URI",
+            schema(
+                json!({
+                    "page_id": str_prop("Page slug or wiki:// URI"),
+                    "with_backlinks": opt_bool("Include incoming links"),
+                    "wiki": opt_str("Target wiki name"),
+                }),
+                &["page_id"],
+            ),
+        ),
+        Tool::new(
+            "procedural_find",
+            "Find procedure runbooks matching an intent",
+            schema(
+                json!({
+                    "intent": str_prop("Natural-language procedure intent"),
+                    "context": opt_str("Additional context to append to the search query"),
+                    "top_k": opt_int("Max results"),
+                    "wiki": opt_str("Target wiki name"),
+                    "format": opt_str("Output format: json | llms (default: json)"),
+                }),
+                &["intent"],
+            ),
+        ),
+        Tool::new(
+            "procedural_get",
+            "Read a procedure runbook by proc_id or URI",
+            schema(
+                json!({
+                    "proc_id": str_prop("Procedure slug or wiki:// URI"),
+                    "wiki": opt_str("Target wiki name"),
+                }),
+                &["proc_id"],
+            ),
+        ),
+        Tool::new(
+            "graph_neighbors",
+            "Read related pages around a root page",
+            schema(
+                json!({
+                    "page_id": str_prop("Root page slug or URI"),
+                    "depth": opt_int("Hop depth"),
+                    "edge_types": opt_str("Relation label filter"),
+                    "wiki": opt_str("Target wiki name"),
+                }),
+                &["page_id"],
+            ),
+        ),
+        Tool::new(
+            "audit_history",
+            "Read git audit history for a page",
+            schema(
+                json!({
+                    "path": str_prop("Page slug or wiki:// URI"),
+                    "limit": opt_int("Max entries"),
+                    "wiki": opt_str("Target wiki name"),
+                }),
+                &["path"],
+            ),
+        ),
     ]
 }
 
@@ -371,6 +458,13 @@ pub fn call(server: &McpServer, name: &str, args: &Map<String, Value>) -> ToolRe
         "wiki_suggest" => handlers::handle_suggest(server, args),
         "wiki_schema" => handlers::handle_schema(server, args),
         "wiki_export" => handlers::handle_export(server, args),
+        "profile_get" => handlers::handle_profile_get(server, args),
+        "semantic_search" => handlers::handle_semantic_search(server, args),
+        "semantic_get" => handlers::handle_semantic_get(server, args),
+        "procedural_find" => handlers::handle_procedural_find(server, args),
+        "procedural_get" => handlers::handle_procedural_get(server, args),
+        "graph_neighbors" => handlers::handle_graph_neighbors(server, args),
+        "audit_history" => handlers::handle_audit_history(server, args),
         _ => Err(format!("unknown tool: {name}")),
     }));
     match result {

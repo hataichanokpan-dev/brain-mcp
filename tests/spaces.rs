@@ -389,7 +389,9 @@ fn validate_wiki_root_accepts_multi_component() {
 #[test]
 fn validate_wiki_root_rejects_absolute() {
     let dir = tempfile::tempdir().unwrap();
-    let err = llm_wiki::spaces::validate_wiki_root(dir.path(), "/absolute").unwrap_err();
+    let absolute = dir.path().join("absolute");
+    let absolute = absolute.to_string_lossy();
+    let err = llm_wiki::spaces::validate_wiki_root(dir.path(), &absolute).unwrap_err();
     assert!(err.to_string().contains("must be a relative path"));
 }
 
@@ -436,13 +438,13 @@ fn validate_wiki_root_rejects_missing_directory() {
 
 #[test]
 fn validate_wiki_root_rejects_traversal_via_symlink() {
-    let outer = tempfile::tempdir().unwrap();
-    let inner = tempfile::tempdir().unwrap();
-    let link = outer.path().join("escape");
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(inner.path(), &link).unwrap();
     #[cfg(unix)]
     {
+        let outer = tempfile::tempdir().unwrap();
+        let inner = tempfile::tempdir().unwrap();
+        let link = outer.path().join("escape");
+        std::os::unix::fs::symlink(inner.path(), &link).unwrap();
+
         let err = llm_wiki::spaces::validate_wiki_root(outer.path(), "escape").unwrap_err();
         assert!(err.to_string().contains("must be inside"));
     }

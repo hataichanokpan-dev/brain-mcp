@@ -319,6 +319,124 @@ pub fn handle_search(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
     }
 }
 
+// ── Brain Blueprint Read Tier ────────────────────────────────────────────────
+
+/// Handle `profile_get` — read active profile pages, optionally filtered by section.
+pub fn handle_profile_get(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let engine = server.engine();
+    let wiki_name = resolve_wiki_name(&engine, args)?;
+    let section = arg_str(args, "section");
+
+    let result = ops::list(
+        &engine,
+        &wiki_name,
+        Some("profile"),
+        Some("active"),
+        1,
+        Some(100),
+    )
+    .map_err(|e| format!("{e}"))?;
+
+    let mut pages = Vec::new();
+    for page in result.pages {
+        let read = ops::content_read(&engine, &page.slug, Some(&wiki_name), false, false)
+            .map_err(|e| format!("{e}"))?;
+        let ops::ContentReadResult::Page(content) = read else {
+            continue;
+        };
+        let parsed = crate::frontmatter::parse(&content);
+        if let Some(ref wanted) = section {
+            let actual = parsed
+                .frontmatter
+                .get("section")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if actual != wanted {
+                continue;
+            }
+        }
+        pages.push(serde_json::json!({
+            "slug": page.slug,
+            "uri": page.uri,
+            "title": page.title,
+            "section": parsed.frontmatter.get("section").and_then(|v| v.as_str()),
+            "priority": parsed.frontmatter.get("priority").and_then(|v| v.as_str()),
+            "content": content,
+        }));
+    }
+
+    let response = serde_json::json!({
+        "section": section,
+        "pages": pages,
+    });
+    let s = serde_json::to_string_pretty(&response).map_err(|e| format!("{e}"))?;
+    ok_text(s)
+}
+
+/// Handle `semantic_search` — blueprint alias over the current BM25 search.
+pub fn handle_semantic_search(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    handle_search(server, args)
+}
+
+/// Handle `semantic_get` — blueprint alias over content read with backlinks.
+pub fn handle_semantic_get(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let mut mapped = args.clone();
+    if let Some(page_id) = mapped.remove("page_id") {
+        mapped.insert("uri".to_string(), page_id);
+    }
+    if let Some(with_backlinks) = mapped.remove("with_backlinks") {
+        mapped.insert("backlinks".to_string(), with_backlinks);
+    }
+    handle_content_read(server, &mapped)
+}
+
+/// Handle `procedural_find` — search verified/draft procedure runbooks by intent.
+pub fn handle_procedural_find(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let intent = arg_str_req(args, "intent")?;
+    let query = match arg_str(args, "context") {
+        Some(context) if !context.trim().is_empty() => format!("{intent}\n{context}"),
+        _ => intent,
+    };
+
+    let mut mapped = args.clone();
+    mapped.insert("query".to_string(), Value::String(query));
+    mapped.insert("type".to_string(), Value::String("procedure".to_string()));
+    mapped.remove("intent");
+    mapped.remove("context");
+    handle_search(server, &mapped)
+}
+
+/// Handle `procedural_get` — read a procedure runbook.
+pub fn handle_procedural_get(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let mut mapped = args.clone();
+    if let Some(proc_id) = mapped.remove("proc_id") {
+        mapped.insert("uri".to_string(), proc_id);
+    }
+    handle_content_read(server, &mapped)
+}
+
+/// Handle `graph_neighbors` — blueprint alias over graph build.
+pub fn handle_graph_neighbors(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let mut mapped = args.clone();
+    if let Some(page_id) = mapped.remove("page_id") {
+        mapped.insert("root".to_string(), page_id);
+    }
+    if let Some(edge_types) = mapped.remove("edge_types") {
+        mapped.insert("relation".to_string(), edge_types);
+    }
+    mapped.insert("format".to_string(), Value::String("llms".to_string()));
+    handle_graph(server, &mapped)
+}
+
+/// Handle `audit_history` — blueprint alias over git page history.
+pub fn handle_audit_history(server: &McpServer, args: &Map<String, Value>) -> ToolHandlerResult {
+    let mut mapped = args.clone();
+    if let Some(path) = mapped.remove("path") {
+        mapped.insert("slug".to_string(), path);
+    }
+    handle_history(server, &mapped)
+}
+
 // ── List ──────────────────────────────────────────────────────────────────────
 
 /// Handle `wiki_list` — paginated page listing with optional type/status filters.

@@ -88,7 +88,7 @@ Always check before rebuilding.
 
 ### Partial over full
 
-When possible, rebuild only what changed. If 1 type out of 15 changed,
+When possible, rebuild only what changed. If 1 type out of the default type set changed,
 recompile 1 validator and re-index pages of that type — not everything.
 
 ### Reports over side effects

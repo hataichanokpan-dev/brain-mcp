@@ -1,282 +1,629 @@
-# llm-wiki
+# brain-mcp
 
-A headless wiki engine for agents. 23 MCP tools. One Rust binary. No LLM inside.
+Git-backed knowledge engine สำหรับ agent ที่คุยผ่าน MCP ได้ เช่น Codex, Claude Code, Claude Desktop และ IDE อื่นๆ
 
-**Build knowledge that compounds — not answers that evaporate.**
+โปรเจคนี้เริ่มจาก `llm-wiki` engine และกำลังอัปเกรดตาม [BLUEPRINT.md](BLUEPRINT.md) ให้เป็นสมองกลางแบบ 3 stores:
 
-A git-backed Markdown wiki — searchable, typed, graph-linked. Accessible from
-the command line, from any MCP-compatible agent, or from any IDE via ACP.
+- `profile` - กฎ, identity, style, stack, constraints ของผู้ใช้
+- `semantic` - ความรู้แบบ declarative เช่น concept, entity, source, project, decision
+- `procedure` - runbook ที่ execute ได้และต้องมี verification
 
----
+สถานะปัจจุบัน: core engine พร้อมใช้งานเป็น MCP server แล้ว มี Markdown + Git เป็น source of truth, Tantivy BM25 search, typed schemas, graph, audit history และ read-tier tool aliases ตาม blueprint ชุดแรก. Vector/Qdrant/BGE-M3 ยังเป็น phase ถัดไป ยังไม่ได้เปิดใช้ใน binary นี้
 
-## The problem with RAG
+## What It Does
 
-Most AI knowledge tools retrieve and generate on every query. Each answer is
-disposable — nothing is learned, nothing is kept. Ask the same question twice
-and the LLM reasons from scratch.
+`brain-mcp` ทำให้ agent มี long-term knowledge base ที่อ่านและเขียนได้ผ่าน MCP:
 
-llm-wiki implements a different pattern — the **Dynamic Knowledge Repository**
-(DKR), introduced by Andrej Karpathy:
+- เก็บความรู้เป็น Markdown ที่อ่านเองได้
+- validate frontmatter ด้วย JSON Schema
+- search ด้วย BM25
+- สร้าง graph จาก wikilinks และ typed frontmatter edges
+- commit เข้า Git เพื่อ audit และ rollback
+- expose tools ผ่าน MCP stdio หรือ MCP HTTP
+- ใช้กับ Codex และ Claude Code ได้โดยเพิ่ม MCP server config
 
-> Process sources at ingest time, not query time. The LLM integrates each
-> source into the wiki — updating concept pages, creating source summaries,
-> flagging contradictions — and commits the result. Knowledge compounds with
-> every addition.
+ชื่อ binary ตอนนี้ยังเป็น:
 
-|                         | Traditional RAG       | llm-wiki (DKR)              |
-| ----------------------- | --------------------- | --------------------------- |
-| When knowledge is built | At query time         | At ingest time              |
-| Cross-references        | Ad hoc or missed      | Pre-built, typed graph      |
-| Knowledge accumulation  | Resets each query     | Compounds over time         |
-| Audit trail             | None                  | Git history per page        |
-| Data ownership          | Provider systems      | Your files, your git repo   |
-
----
-
-## How it works
-
-The engine is pure infrastructure. It manages files, git, full-text search,
-and graph structure. The LLM is always external — it calls the engine's tools
-via MCP, reads pages, writes pages, and commits knowledge. Intelligence flows
-through skills, not the binary.
-
-```
-LLM agent
-  │
-  ├── wiki_list(format: "llms")             → all pages grouped by type
-  ├── wiki_search("mixture of experts")     → ranked results + facets
-  ├── wiki_content_read("concepts/moe")     → full page + backlinks
-  ├── wiki_graph(root: "concepts/moe")      → typed graph in Mermaid/DOT
-  ├── wiki_suggest("concepts/moe")          → pages worth linking
-  ├── wiki_content_new("concepts/new-page") → scaffold + returns local path
-  ├── [write directly to path]              → no MCP round-trip
-  └── wiki_ingest(path: "concepts/")        → validate, index, commit
+```bash
+llm-wiki
 ```
 
-A wiki page is a plain Markdown file with typed frontmatter:
+ชื่อ crate ยังเป็น:
 
-```yaml
+```toml
+llm-wiki-engine
+```
+
+## Current Tool Surface
+
+Core wiki tools:
+
+- `wiki_search`, `wiki_list`, `wiki_content_read`, `wiki_content_write`
+- `wiki_content_new`, `wiki_content_commit`, `wiki_ingest`
+- `wiki_graph`, `wiki_suggest`, `wiki_lint`, `wiki_stats`
+- `wiki_history`, `wiki_export`, `wiki_schema`
+- `wiki_spaces_create`, `wiki_spaces_register`, `wiki_spaces_list`, `wiki_spaces_remove`, `wiki_spaces_set_default`
+- `wiki_config`, `wiki_index_rebuild`, `wiki_index_status`, `wiki_resolve`
+
+Blueprint read-tier aliases:
+
+- `profile_get`
+- `semantic_search`
+- `semantic_get`
+- `procedural_find`
+- `procedural_get`
+- `graph_neighbors`
+- `audit_history`
+
+Important: `semantic_search` currently maps to the existing BM25 search. Hybrid vector search with Qdrant/BGE-M3 is not implemented yet
+
+## Requirements
+
+- Rust 1.95+
+- Git
+- Windows, macOS, or Linux
+- For integration tests: Python 3.11+ and `uv`
+
+This repo includes `rust-toolchain.toml`, so `cargo` will use Rust 1.95 automatically when available.
+
+## Install From Source
+
+Clone and build:
+
+```bash
+git clone <repo-url> brain-mcp
+cd brain-mcp
+cargo build --release
+```
+
+Install into Cargo bin path:
+
+```bash
+cargo install --path .
+```
+
+Verify:
+
+```bash
+llm-wiki --version
+```
+
+If you do not install it globally, use the built binary directly:
+
+Windows:
+
+```powershell
+.\target\release\llm-wiki.exe --version
+```
+
+macOS/Linux:
+
+```bash
+./target/release/llm-wiki --version
+```
+
+## Create Your Brain Wiki
+
+Create a wiki repository. This is where the actual memory lives:
+
+Windows PowerShell:
+
+```powershell
+llm-wiki spaces create "$HOME\wikis\brain" --name brain --set-default
+```
+
+macOS/Linux:
+
+```bash
+llm-wiki spaces create ~/wikis/brain --name brain --set-default
+```
+
+This creates:
+
+```text
+brain/
+  wiki/              # Markdown content
+  schemas/           # JSON schemas
+  inbox/             # ingest staging
+  raw/               # raw/archive material
+  wiki.toml
+  .git/
+```
+
+Rebuild the index:
+
+```bash
+llm-wiki index rebuild --wiki brain
+```
+
+Check status:
+
+```bash
+llm-wiki index status --wiki brain
+```
+
+## Suggested Layout For Blueprint Stores
+
+Inside the wiki content root (`~/wikis/brain/wiki`):
+
+```text
+profile/
+  identity.md
+  hard-rules.md
+  soft-preferences.md
+  style-guide.md
+  stack.md
+  constraints.md
+
+concepts/
+entities/
+sources/
+projects/
+decisions/
+
+procedural/
+  deployment/
+  development/
+  troubleshooting/
+```
+
+Example profile page:
+
+```markdown
 ---
-type: concept
-title: Mixture of Experts
+title: "Hard Rules"
+type: profile
+section: rules
+priority: hard
 status: active
-confidence: 0.9
-tags: [routing, scaling, efficiency]
-sources:
-  - sources/switch-transformer-2021
-  - sources/mixtral-2024
-concepts:
-  - concepts/sparse-routing
-  - concepts/scaling-laws
+created: 2026-05-23
+last_verified: 2026-05-23
 ---
 
-Sparse routing of tokens to expert subnetworks...
+- Before commit, run format, lint, and tests.
+- Do not silently write memory. Propose first when changing user profile.
 ```
 
-The engine validates frontmatter against a JSON Schema, extracts typed graph
-edges from `sources` and `concepts`, and indexes everything in tantivy. The
-graph is live the moment a page is committed.
+Example procedure page:
 
+```markdown
+---
+title: "Deploy brain-mcp"
+type: procedure
+status: draft
+verified_count: 0
+failure_count: 0
+verification:
+  - "llm-wiki --version exits 0"
+  - "MCP client can list tools"
+risk_level: medium
+tags: [deployment, mcp]
 ---
 
-## Install
+## Steps
 
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/geronimo-iia/llm-wiki/main/install.sh | bash
+1. Build release binary.
+2. Register MCP server in client config.
+3. Restart client.
 
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/geronimo-iia/llm-wiki/main/install.ps1 | iex
+## Verification
 
-# Homebrew
-brew install geronimo-iia/tap/llm-wiki
+- Run `llm-wiki --version`
+- Ask the MCP client to list tools
 
-# Cargo
-cargo install llm-wiki-engine
+## Rollback
+
+1. Remove MCP server entry from client config.
+2. Restart client.
 ```
 
-→ [All installation options](docs/guides/installation.md)
-
----
-
-## Quick start
+Ingest after editing:
 
 ```bash
-# Create a wiki space
-llm-wiki spaces create ~/wikis/research --name research
+llm-wiki ingest profile --wiki brain
+llm-wiki ingest procedural --wiki brain
+```
 
-# Start the MCP server
+## Run As MCP Server
+
+Default mode is MCP over stdio:
+
+```bash
 llm-wiki serve
 ```
 
-Connect your agent or editor — VS Code, Cursor, Windsurf, Zed, Claude Code —
-via the MCP config. The 23 tools are immediately available.
+With live indexing:
 
-→ [Getting started guide](docs/guides/getting-started.md) · [IDE integration](docs/guides/ide-integration.md)
+```bash
+llm-wiki serve --watch
+```
 
----
+MCP over HTTP:
 
-## IDE integration via ACP
+```bash
+llm-wiki serve --http :18765
+```
 
-In addition to MCP, llm-wiki speaks **ACP** (Agent Client Protocol) — a
-session-oriented streaming protocol over stdio. Connect from Zed or any
-ACP-compatible editor and trigger built-in workflows directly from the IDE
-panel:
+HTTP endpoint:
 
-| Prompt | What runs |
-| ------ | --------- |
-| `llm-wiki:research <query>` | Search + read top results, stream summaries |
-| `llm-wiki:lint [rules]` | Run structural lint rules, stream findings |
-| `llm-wiki:graph [root]` | Build and stream the concept graph |
-| `llm-wiki:ingest [path]` | Ingest a path, stream the report |
-| `llm-wiki:use <slug>` | Stream a page body directly into the IDE |
-| `llm-wiki:help` | List all available workflows |
+```text
+http://127.0.0.1:18765/mcp
+```
 
-Start with `--acp` alongside `--http` to give ACP exclusive stdio:
+ACP plus MCP HTTP:
 
 ```bash
 llm-wiki serve --acp --http :18765
 ```
 
-→ [IDE integration guide](docs/guides/ide-integration.md) · [ACP configuration](docs/guides/configuration.md)
+Why: ACP uses stdio. MCP stdio and ACP cannot share the same stdio stream, so when ACP is enabled, run MCP through HTTP.
 
----
+## Configure Codex
 
-## What agents can do
+Codex reads MCP servers from:
 
-| Tool | What it does |
-| ---- | ------------ |
-| `wiki_search` | BM25 full-text search across one or all wikis, with type/status/tag facets |
-| `wiki_list` | Paginated page listing with filters; `format: "llms"` for LLM-readable output |
-| `wiki_content_read` | Read a page with optional backlinks |
-| `wiki_content_write` | Write a page (validates frontmatter against type schema) |
-| `wiki_content_new` | Scaffold a new page; returns local `path` for direct writes |
-| `wiki_resolve` | Resolve a slug or `wiki://` URI to its local filesystem path |
-| `wiki_ingest` | Validate a path, update the index, commit to git |
-| `wiki_graph` | Typed concept graph — Mermaid, DOT, or natural-language `llms` format |
-| `wiki_suggest` | Find pages worth linking by tag overlap, graph distance, BM25 similarity |
-| `wiki_stats` | Wiki health: page counts, type distribution, staleness, graph density |
-| `wiki_lint` | Deterministic quality rules: orphans, broken links, missing fields, stale pages |
-| `wiki_export` | Write full wiki to `llms.txt` at wiki root — for ecosystem publishing or audit |
-| `wiki_history` | Git commit history for a page, with rename following |
-| `wiki_schema` | Show, validate, or template a type schema |
-| `wiki_spaces_*` | Create, register, list, remove wiki spaces; supports custom `wiki_root` |
-
-Full tool reference: [`docs/specifications/tools/`](docs/specifications/tools/)
-
----
-
-## Skills
-
-The engine exposes tools. Skills tell agents how to use them.
-
-[llm-wiki-skills](https://github.com/geronimo-iia/llm-wiki-skills) is a
-Claude Code plugin that ships ready-to-use workflows:
-
-| Skill | What it does |
-| ----- | ------------ |
-| `crystallize` | Distil a session into durable wiki pages — decisions, findings, open questions |
-| `ingest` | Process source files from `inbox/` into synthesized, cross-referenced pages |
-| `research` | Search the wiki and synthesize an answer from existing knowledge |
-| `lint` | Structural audit — orphans, broken links, schema issues, under-linked pages |
-| `graph` | Explore and interpret the concept graph |
-
-Skills are plain Markdown files — readable by the LLM, replaceable, forkable.
-Write your own for your own workflows.
-
----
-
-## Architecture
-
-```
-llm-wiki-engine          pure Rust binary — tools, git, index, graph
-llm-wiki-skills          Claude Code plugin — workflow skills (Markdown)
-llm-wiki-hugo-cms        Hugo scaffold — render the wiki as a website
+```text
+~/.codex/config.toml
 ```
 
-The engine has no opinions about workflows, LLM providers, or interfaces.
-Every LLM call happens outside the binary. Every workflow lives in a skill.
-The separation means skills ship independently, the engine stays stable, and
-nothing is coupled to a specific AI provider.
+Add a stdio MCP server:
 
----
+```toml
+[mcp_servers.brain]
+command = "llm-wiki"
+args = ["serve"]
+```
 
-## Technology
+If `llm-wiki` is not on PATH, point to the binary directly.
 
-The file format is Markdown. The history store is git. Both predate llm-wiki
-and will outlive it — your wiki is readable, diffable, and portable with zero
-dependency on this tool. The engine itself is a single Rust binary with no
-runtime, no database, and nothing to keep running between sessions.
+Windows example:
 
-Single Rust binary. No runtime, no database, no Docker.
+```toml
+[mcp_servers.brain]
+command = 'C:\Programing\PersonalAI\mcp\brain-mcp\target\release\llm-wiki.exe'
+args = ["serve"]
+```
 
-| Component | Technology |
-| --------- | ---------- |
-| Search | [tantivy](https://crates.io/crates/tantivy) — BM25, Lucene-class performance |
-| Git | [git2](https://crates.io/crates/git2) — libgit2 bindings |
-| Graph | [petgraph](https://crates.io/crates/petgraph) — typed DiGraph |
-| MCP | [rmcp](https://crates.io/crates/rmcp) — stdio + Streamable HTTP |
-| ACP | [agent-client-protocol](https://crates.io/crates/agent-client-protocol) |
+macOS/Linux example:
 
----
+```toml
+[mcp_servers.brain]
+command = "/home/you/projects/brain-mcp/target/release/llm-wiki"
+args = ["serve"]
+```
 
-## Documentation
+Use a custom config path:
 
-| | |
-| - | - |
-| [Getting started](docs/guides/getting-started.md) | End-to-end walkthrough |
-| [Guides](docs/guides/README.md) | Installation, IDE, custom types, CI/CD, multi-wiki |
-| [Specifications](docs/specifications/README.md) | Formal tool and model contracts |
-| [Architecture](docs/overview.md) | Core concepts, project map |
-| [Roadmap](docs/roadmap.md) | What shipped, what's next |
-| [Decisions](docs/decisions/README.md) | Architectural decision records |
+```toml
+[mcp_servers.brain]
+command = "llm-wiki"
+args = ["--config", "C:\\Users\\you\\.llm-wiki\\config.toml", "serve"]
+```
 
----
+Or with environment:
 
-## Related Projects
+```toml
+[mcp_servers.brain]
+command = "llm-wiki"
+args = ["serve"]
 
-| Project | Roadmap |
-| ------- | ------- |
-| [llm-wiki-skills](https://github.com/geronimo-iia/llm-wiki-skills) | `docs/roadmap.md` |
-| [llm-wiki-hugo-cms](https://github.com/geronimo-iia/llm-wiki-hugo-cms) | `docs/roadmap.md` |
-| [homebrew-tap](https://github.com/geronimo-iia/homebrew-tap) | Formula updates per release |
-| [asdf-llm-wiki](https://github.com/geronimo-iia/asdf-llm-wiki) | Plugin updates per release |
+[mcp_servers.brain.env]
+LLM_WIKI_CONFIG = "C:\\Users\\you\\.llm-wiki\\config.toml"
+```
 
----
+Restart Codex after editing the config.
 
-## Why I built this
+Quick verification prompt in Codex:
 
-Like many of you, I've been exploring agents, LLMs, and all that comes with it.
-This project started after Andrej Karpathy's post — he put into words something
-I was already practicing: plain Markdown files with structured frontmatter as a
-practical knowledge base, for work and for the messier explorations.
+```text
+List available MCP tools from brain.
+```
 
-The technical direction reflects years of SRE-minded practice: minimize
-dependencies, use proven tools, keep the binary dumb. Written in Rust with
-Claude as a pair programmer — a language I enjoy exploring more and more.
+Then:
 
-I have "a few" years of experience, but if you spot bad practices, call them
-out — I'm doing this to learn together too. And if you're using it, personally
-or at work, I'd love to hear about it :)
+```text
+Call profile_get and summarize my active profile.
+```
 
-## Acknowledgments
+## Configure Claude Code
 
-- **[Andrej Karpathy](https://karpathy.ai/)** — for the
-  [LLM Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-  that defined the Dynamic Knowledge Repository pattern.
-- **[vanillaflava](https://github.com/vanillaflava)** — for
-  [llm-wiki-claude-skills](https://github.com/vanillaflava/llm-wiki-claude-skills),
-  which turned the pattern into a practical skill architecture.
+Claude Code can use a project `.mcp.json` file.
 
-llm-wiki is a continuation of
-[agent-foundation](https://github.com/geronimo-iia/agent-foundation).
+Create `.mcp.json` in the project where you want Claude Code to see the server:
 
----
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "llm-wiki",
+      "args": ["serve"]
+    }
+  }
+}
+```
 
-## Contributing
+Windows direct binary example:
 
-[Contributing guide](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md)
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "C:\\Programing\\PersonalAI\\mcp\\brain-mcp\\target\\release\\llm-wiki.exe",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+With custom config:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "llm-wiki",
+      "args": ["--config", "C:\\Users\\you\\.llm-wiki\\config.toml", "serve"]
+    }
+  }
+}
+```
+
+With live indexing:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "llm-wiki",
+      "args": ["serve", "--watch"]
+    }
+  }
+}
+```
+
+Alternative Claude Code CLI flow:
+
+```bash
+claude mcp add
+```
+
+or:
+
+```bash
+claude mcp add-json brain '{"command":"llm-wiki","args":["serve"]}'
+```
+
+Restart Claude Code after changing MCP config.
+
+Quick verification prompt in Claude Code:
+
+```text
+Use the brain MCP server. Call wiki_spaces_list, then call profile_get.
+```
+
+## Configure Claude Desktop
+
+Claude Desktop MCP config uses the same shape:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "llm-wiki",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop after editing the config.
+
+## Remote MCP Server
+
+For a remote host, run HTTP transport:
+
+```bash
+llm-wiki serve --http :18765
+```
+
+Use a private network layer such as Tailscale or Cloudflare Tunnel. Do not expose this server directly to the public internet. The wiki stores private memory and source material.
+
+Remote endpoint:
+
+```text
+http://<host>:18765/mcp
+```
+
+If a client only supports stdio MCP, run the server locally or use a stdio-to-HTTP bridge.
+
+## Common Workflows
+
+Search:
+
+```bash
+llm-wiki search "hybrid retrieval" --wiki brain
+```
+
+Create a page:
+
+```bash
+llm-wiki content new concepts/hybrid-retrieval --type concept --name "Hybrid Retrieval" --wiki brain
+```
+
+Read a page:
+
+```bash
+llm-wiki content read concepts/hybrid-retrieval --wiki brain
+```
+
+Ingest and commit:
+
+```bash
+llm-wiki ingest concepts/hybrid-retrieval --wiki brain
+```
+
+Show graph:
+
+```bash
+llm-wiki graph --root concepts/hybrid-retrieval --depth 2 --wiki brain
+```
+
+Show audit history:
+
+```bash
+llm-wiki history concepts/hybrid-retrieval --wiki brain
+```
+
+## Verification Checklist
+
+After setup:
+
+```bash
+llm-wiki spaces list
+llm-wiki schema list --wiki brain
+llm-wiki index rebuild --wiki brain
+llm-wiki search "test" --wiki brain
+```
+
+Expected:
+
+- `spaces list` shows `brain`
+- `schema list` includes `profile`, `entity`, `source`, `project`, `decision`, `procedure`
+- `index rebuild` succeeds
+- MCP client can list tools
+
+## Development
+
+Run Rust tests:
+
+```bash
+cargo test
+```
+
+On Windows, this repo currently works cleanly with MSVC Rust:
+
+```powershell
+rustup toolchain install 1.95-x86_64-pc-windows-msvc --component rustfmt --component clippy
+cargo +1.95-x86_64-pc-windows-msvc test
+```
+
+Format and lint:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+```
+
+Integration tests:
+
+```bash
+cd tests-integration
+uv sync --group dev
+```
+
+Windows:
+
+```powershell
+New-Item -ItemType Directory -Force -Path C:\tmp | Out-Null
+$env:PYTHONUTF8 = "1"
+$env:LLM_WIKI_BIN = "C:\path\to\llm-wiki.exe"
+uv run pytest engine/ -v
+uv run pytest acp/ -v
+uv run pytest mcp/ -v
+```
+
+macOS/Linux:
+
+```bash
+export LLM_WIKI_BIN=/path/to/llm-wiki
+uv run pytest engine/ -v
+uv run pytest acp/ -v
+uv run pytest mcp/ -v
+```
+
+Run integration suites separately. The test files intentionally reuse names across `engine/`, `acp/`, and `mcp/`, so collecting all folders in one pytest process can cause import mismatch.
+
+## Troubleshooting
+
+### Codex or Claude Code cannot find the server
+
+Use an absolute `command` path in the MCP config.
+
+Windows JSON paths must escape backslashes:
+
+```json
+"command": "C:\\path\\to\\llm-wiki.exe"
+```
+
+TOML can use single-quoted literal strings:
+
+```toml
+command = 'C:\path\to\llm-wiki.exe'
+```
+
+### Server exits immediately
+
+Run it manually:
+
+```bash
+llm-wiki serve
+```
+
+If config is missing, create a wiki first:
+
+```bash
+llm-wiki spaces create ~/wikis/brain --name brain --set-default
+```
+
+### Tool list is empty
+
+Rebuild index and restart the MCP client:
+
+```bash
+llm-wiki index rebuild --wiki brain
+```
+
+### HTTP client cannot connect
+
+Make sure you use `/mcp`:
+
+```text
+http://127.0.0.1:18765/mcp
+```
+
+### ACP conflicts with MCP stdio
+
+Use:
+
+```bash
+llm-wiki serve --acp --http :18765
+```
+
+Do not run `serve --acp` as a normal MCP stdio server.
+
+## Roadmap
+
+Implemented now:
+
+- Markdown + Git canonical storage
+- schemas for profile, semantic, and procedure memory
+- BM25 search
+- graph and backlinks
+- Git audit history
+- MCP stdio and HTTP transport
+- ACP transport
+- read-tier blueprint aliases
+
+Next major phases from [BLUEPRINT.md](BLUEPRINT.md):
+
+- Qdrant vector index
+- BGE-M3 dense + sparse embeddings
+- BGE reranker
+- true hybrid `semantic_search`
+- propose/commit gate for no silent writes
+- procedural promotion workflow with verification evidence
+- consolidation and stale/contradiction review workflow
 
 ## License
 
-[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE)
+MIT OR Apache-2.0

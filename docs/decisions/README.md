@@ -146,7 +146,6 @@ All decisions made during the initial development cycle leading to the first pub
 | -------- | ------- |
 | [search-facets](0.1.1/search-facets.md) | Always-on facets, hybrid filtering, top-N tags |
 | [wiki-history](0.1.1/wiki-history.md) | Shell git log, follow config, NUL-delimited parsing |
-| [no-embedding-search](0.1.1/no-embedding-search.md) | BM25-only for v0.1; no vector search dependency |
 | [page-body-templates](0.1.1/page-body-templates.md) | Naming convention in schemas/, fallback chain, watcher ignores .md |
 | [wiki-diff-not-a-tool](0.1.1/wiki-diff-not-a-tool.md) | git diff via bash, not a tool — design principle |
 | [wiki-stats](0.1.1/wiki-stats.md) | Composed from existing primitives, fixed staleness buckets |

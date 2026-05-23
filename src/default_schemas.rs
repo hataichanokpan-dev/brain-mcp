@@ -6,6 +6,9 @@ const PAPER: &str = include_str!("../schemas/paper.json");
 const SKILL: &str = include_str!("../schemas/skill.json");
 const DOC: &str = include_str!("../schemas/doc.json");
 const SECTION: &str = include_str!("../schemas/section.json");
+const PROFILE: &str = include_str!("../schemas/profile.json");
+const SEMANTIC: &str = include_str!("../schemas/semantic.json");
+const PROCEDURE: &str = include_str!("../schemas/procedure.json");
 
 const TMPL_CONCEPT: &str = include_str!("../schemas/concept.md");
 const TMPL_PAPER: &str = include_str!("../schemas/paper.md");
@@ -22,6 +25,9 @@ pub fn default_schemas() -> HashMap<&'static str, &'static str> {
         ("skill.json", SKILL),
         ("doc.json", DOC),
         ("section.json", SECTION),
+        ("profile.json", PROFILE),
+        ("semantic.json", SEMANTIC),
+        ("procedure.json", PROCEDURE),
     ])
 }
 

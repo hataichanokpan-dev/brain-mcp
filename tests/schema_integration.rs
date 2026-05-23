@@ -26,11 +26,17 @@ fn schema_list_returns_all_default_types() {
     let eng = mgr.state.read().unwrap();
 
     let entries = ops::schema_list(&eng, "test").unwrap();
-    assert_eq!(entries.len(), 15);
+    assert_eq!(entries.len(), 21);
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     assert!(names.contains(&"default"));
     assert!(names.contains(&"concept"));
+    assert!(names.contains(&"profile"));
+    assert!(names.contains(&"entity"));
+    assert!(names.contains(&"source"));
+    assert!(names.contains(&"project"));
+    assert!(names.contains(&"decision"));
+    assert!(names.contains(&"procedure"));
     assert!(names.contains(&"skill"));
     assert!(names.contains(&"paper"));
     assert!(names.contains(&"doc"));

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/geronimo-iia/llm-wiki/schemas/v0.5.0/semantic.json",
+  "title": "Semantic memory types",
+  "description": "Declarative knowledge pages used by the brain-mcp semantic store.",
+  "type": "object",
+  "required": ["title", "type"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "type": {
+      "type": "string",
+      "description": "Semantic subtype",
+      "enum": ["entity", "source", "project", "decision"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-line scope"
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle state",
+      "enum": ["active", "draft", "stale", "contested"]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Certainty of this page's content. 0.0=speculative, 1.0=verified.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.5
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lowercase hyphenated search terms"
+    },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Source pages that support this page"
+    },
+    "related": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Related semantic pages"
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "Slug of the page this entry replaces"
+    },
+    "last_lint": {
+      "type": "string",
+      "description": "ISO 8601 date"
+    },
+    "content_hash": {
+      "type": "string",
+      "description": "Content hash used to detect re-index/re-embed need"
+    },
+    "embedding_version": {
+      "type": "string",
+      "description": "Embedding model/version that produced the current vector index"
+    }
+  },
+  "x-wiki-types": {
+    "entity": "Semantic entity — person, organization, product, or system",
+    "source": "Semantic source summary — article, paper, book, documentation, or dataset",
+    "project": "Semantic project context — durable project facts and constraints",
+    "decision": "Semantic decision — ADR-style record"
+  },
+  "x-graph-edges": {
+    "sources": {
+      "relation": "supported-by",
+      "direction": "outgoing",
+      "target_types": ["source", "paper", "article", "documentation", "clipping", "transcript", "note", "data", "book-chapter", "thread"]
+    },
+    "related": {
+      "relation": "related",
+      "direction": "outgoing",
+      "target_types": ["concept", "entity", "source", "project", "decision"]
+    },
+    "supersedes": {
+      "relation": "supersedes",
+      "direction": "outgoing",
+      "target_types": ["concept", "entity", "source", "project", "decision"]
+    }
+  },
+  "additionalProperties": true
+}

@@ -13,7 +13,7 @@ fn compile(name: &str) -> Validator {
 
 #[test]
 fn schema_count() {
-    assert_eq!(default_schemas().len(), 6);
+    assert_eq!(default_schemas().len(), 9);
 }
 
 #[test]
@@ -107,6 +107,67 @@ fn concept_rejects_invalid_confidence() {
     })));
 }
 
+// ── semantic/profile/procedure.json ──────────────────────────────────────────
+
+#[test]
+fn semantic_accepts_blueprint_decision() {
+    let v = compile("semantic.json");
+    assert!(v.is_valid(&json!({
+        "title": "Choose Qdrant",
+        "type": "decision",
+        "status": "active",
+        "confidence": 0.9,
+        "tags": ["retrieval", "vector"],
+        "sources": ["source/qdrant-docs"],
+        "related": ["concepts/hybrid-search"],
+        "content_hash": "sha256:abc",
+        "embedding_version": "bge-m3-v1"
+    })));
+}
+
+#[test]
+fn semantic_rejects_invalid_confidence() {
+    let v = compile("semantic.json");
+    assert!(!v.is_valid(&json!({
+        "title": "Bad",
+        "type": "entity",
+        "confidence": 2.0
+    })));
+}
+
+#[test]
+fn profile_requires_constitution_fields() {
+    let v = compile("profile.json");
+    assert!(!v.is_valid(&json!({"title": "Hard Rules", "type": "profile"})));
+    assert!(v.is_valid(&json!({
+        "title": "Hard Rules",
+        "type": "profile",
+        "section": "rules",
+        "priority": "hard",
+        "status": "active",
+        "created": "2026-05-23",
+        "last_verified": "2026-05-23"
+    })));
+}
+
+#[test]
+fn procedure_requires_verification() {
+    let v = compile("procedure.json");
+    assert!(!v.is_valid(&json!({
+        "title": "Deploy brain-mcp",
+        "type": "procedure",
+        "status": "verified"
+    })));
+    assert!(v.is_valid(&json!({
+        "title": "Deploy brain-mcp",
+        "type": "procedure",
+        "status": "verified",
+        "verified_count": 3,
+        "verification": ["curl /health returns 200"],
+        "risk_level": "medium"
+    })));
+}
+
 // ── paper.json ───────────────────────────────────────────────────────────────
 
 #[test]
@@ -189,14 +250,20 @@ fn all_schemas_have_x_wiki_types() {
 }
 
 #[test]
-fn default_type_entries_discovers_all_15_types() {
+fn default_type_entries_discovers_all_21_types() {
     let entries = llm_wiki::default_schemas::default_type_entries();
-    assert_eq!(entries.len(), 15);
+    assert_eq!(entries.len(), 21);
 
     let names: Vec<&str> = entries.iter().map(|e| e.type_name.as_str()).collect();
     assert!(names.contains(&"default"));
     assert!(names.contains(&"concept"));
     assert!(names.contains(&"query-result"));
+    assert!(names.contains(&"profile"));
+    assert!(names.contains(&"entity"));
+    assert!(names.contains(&"source"));
+    assert!(names.contains(&"project"));
+    assert!(names.contains(&"decision"));
+    assert!(names.contains(&"procedure"));
     assert!(names.contains(&"paper"));
     assert!(names.contains(&"article"));
     assert!(names.contains(&"documentation"));

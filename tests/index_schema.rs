@@ -414,11 +414,10 @@ fn repo_schemas_field_count_is_reasonable() {
     setup_wiki_with_repo_schemas(dir.path());
     let is = IndexSchema::build_from_schemas(dir.path(), "en_stem").unwrap();
 
-    // 4 fixed + fields from 6 schemas (deduplicated, aliases skipped)
-    // Should be roughly 25-35 fields
+    // 4 fixed + fields from default schemas (deduplicated, aliases skipped).
     let count = is.fields.len();
     assert!(
-        (20..=50).contains(&count),
-        "unexpected field count: {count} (expected 20-50)"
+        (20..=70).contains(&count),
+        "unexpected field count: {count} (expected 20-70)"
     );
 }

@@ -14,12 +14,18 @@ fn fm(fields: &[(&str, &str)]) -> BTreeMap<String, Value> {
 // ── from_embedded ─────────────────────────────────────────────────────────────
 
 #[test]
-fn embedded_knows_all_15_types() {
+fn embedded_knows_all_21_types() {
     let reg = SpaceTypeRegistry::from_embedded();
     for t in &[
         "default",
         "concept",
         "query-result",
+        "profile",
+        "entity",
+        "source",
+        "project",
+        "decision",
+        "procedure",
         "section",
         "paper",
         "article",
@@ -44,9 +50,9 @@ fn embedded_unknown_type() {
 }
 
 #[test]
-fn embedded_list_types_returns_15() {
+fn embedded_list_types_returns_21() {
     let reg = SpaceTypeRegistry::from_embedded();
-    assert_eq!(reg.list_types().len(), 15);
+    assert_eq!(reg.list_types().len(), 21);
 }
 
 #[test]
@@ -186,7 +192,7 @@ fn build_falls_back_to_embedded_when_no_schemas_dir() {
 
     let reg = SpaceTypeRegistry::build(dir.path()).unwrap();
     assert!(reg.is_known("concept"));
-    assert_eq!(reg.list_types().len(), 15);
+    assert_eq!(reg.list_types().len(), 21);
 }
 
 // ── validate ──────────────────────────────────────────────────────────────────

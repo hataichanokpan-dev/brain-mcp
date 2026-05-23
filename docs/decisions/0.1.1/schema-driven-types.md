@@ -16,7 +16,7 @@ The initial design (schema-md-eliminated) moved the type registry from
 redundancy: every type had to be declared in both a JSON Schema file
 (for validation) and in `wiki.toml` (for the engine to find it).
 
-For the 15 default types, `spaces create` generated 15 `[types.*]`
+For the default types, `spaces create` generated one `[types.*]`
 entries in `wiki.toml` — all pointing to 6 schema files. The schema
 files already knew which types they served. The `wiki.toml` entries
 were just a lookup table duplicating information the schemas contained.

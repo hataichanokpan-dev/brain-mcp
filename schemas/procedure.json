@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/geronimo-iia/llm-wiki/schemas/v0.5.0/procedure.json",
+  "title": "Procedural memory type",
+  "description": "Executable runbook with explicit verification and rollback.",
+  "type": "object",
+  "required": ["title", "type", "status", "verification"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "type": {
+      "type": "string",
+      "const": "procedure",
+      "description": "Page type"
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle state",
+      "enum": ["verified", "draft", "deprecated", "needs_review"]
+    },
+    "verified_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "last_verified": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 date"
+    },
+    "last_failed": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 date"
+    },
+    "failure_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "inputs": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "preconditions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "postconditions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verification": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Pass/fail verification checks required before promotion"
+    },
+    "rollback": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "related_procedures": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "estimated_duration": {
+      "type": "string"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    }
+  },
+  "x-wiki-types": {
+    "procedure": "Procedural memory — executable runbook with verification"
+  },
+  "x-graph-edges": {
+    "related_procedures": {
+      "relation": "related-procedure",
+      "direction": "outgoing",
+      "target_types": ["procedure"]
+    }
+  },
+  "additionalProperties": true
+}

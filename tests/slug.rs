@@ -42,6 +42,17 @@ fn slug_trims_whitespace() {
     assert_eq!(s.as_str(), "concepts/moe");
 }
 
+#[test]
+fn slug_normalizes_backslashes() {
+    let s = Slug::try_from("concepts\\moe").unwrap();
+    assert_eq!(s.as_str(), "concepts/moe");
+}
+
+#[test]
+fn slug_rejects_windows_traversal_after_normalizing() {
+    assert!(Slug::try_from("concepts\\..\\secrets").is_err());
+}
+
 // ── Slug::from_path ───────────────────────────────────────────────────────────
 
 #[test]
