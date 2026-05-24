@@ -482,7 +482,8 @@ fn create_with_custom_wiki_root_creates_correct_directory() {
     let toml_content = std::fs::read_to_string(wiki_path.join("wiki.toml")).unwrap();
     assert!(toml_content.contains("wiki_root = \"skills\""));
     let hugo_content = std::fs::read_to_string(wiki_path.join("site/hugo.toml")).unwrap();
-    assert!(hugo_content.contains("source = \"../skills\""));
+    assert!(hugo_content.contains("source = \"content\""));
+    assert!(wiki_path.join("site/content").is_dir());
 }
 
 #[test]
