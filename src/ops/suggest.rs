@@ -161,7 +161,7 @@ pub fn suggest(
     }
 
     // Strategy 3: BM25 similarity (title + summary as query)
-    let query = format!("{} {}", input_doc.title, input_doc.summary);
+    let query = suggest_query(&input_doc.title, &input_doc.summary);
     if !query.trim().is_empty() {
         let results = search::search(
             &query,
@@ -276,6 +276,23 @@ pub fn suggest(
         .collect();
 
     Ok(suggestions)
+}
+
+fn suggest_query(title: &str, summary: &str) -> String {
+    [title, summary]
+        .join(" ")
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c.is_whitespace() {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

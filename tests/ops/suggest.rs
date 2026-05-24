@@ -120,3 +120,42 @@ fn suggest_has_field_suggestion() {
         );
     }
 }
+
+#[test]
+fn suggest_handles_punctuation_in_title_query() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+
+    let wiki_path = dir.path().join("test");
+    let wiki_root = wiki_path.join("wiki");
+    fs::create_dir_all(wiki_root.join("concepts")).unwrap();
+    fs::write(
+        wiki_root.join("concepts/thai-tts.md"),
+        "---\ntitle: \"Thai TTS & Voice Cloning - MCP Smoke\"\ntype: concept\nstatus: active\n---\n\nVoice cloning notes.\n",
+    )
+    .unwrap();
+    fs::write(
+        wiki_root.join("concepts/voice-synthesis.md"),
+        "---\ntitle: \"Voice Synthesis\"\ntype: concept\nstatus: active\n---\n\nVoice cloning and TTS overview.\n",
+    )
+    .unwrap();
+    git::commit(&wiki_path, "add punctuation title pages").unwrap();
+
+    let manager = WikiEngine::build(&config_path).unwrap();
+    {
+        let engine = manager.state.read().unwrap();
+        ops::ingest(&engine, &manager, "concepts/thai-tts.md", false, "test").unwrap();
+        ops::ingest(
+            &engine,
+            &manager,
+            "concepts/voice-synthesis.md",
+            false,
+            "test",
+        )
+        .unwrap();
+    }
+
+    let engine = manager.state.read().unwrap();
+    let suggestions = ops::suggest(&engine, "concepts/thai-tts", None, None).unwrap();
+    assert!(suggestions.iter().all(|s| s.slug != "concepts/thai-tts"));
+}
