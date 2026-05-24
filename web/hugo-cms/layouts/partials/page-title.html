@@ -1,0 +1,23 @@
+{{- $title := .Title -}}
+{{- if not $title -}}
+  {{- with .Params.title -}}
+    {{- $title = . -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $title -}}
+  {{- with .Params.name -}}
+    {{- $title = . -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $title -}}
+  {{- with .LinkTitle -}}
+    {{- $title = . -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (not $title) .File -}}
+  {{- $title = title (replaceRE "[-_]+" " " .File.BaseFileName) -}}
+{{- end -}}
+{{- if not $title -}}
+  {{- $title = "Untitled" -}}
+{{- end -}}
+{{- $title -}}

@@ -1,8 +1,13 @@
 {{ define "main" }}
 <section class="section">
   <header class="section-header">
-    <h1>{{ .Title }}</h1>
+    <p class="eyebrow">Section</p>
+    <h1>{{ partial "page-title.html" . }}</h1>
     {{ with .Content }}<div class="section-intro">{{ . }}</div>{{ end }}
+    <div class="section-tools">
+      <span>{{ len .Pages }} pages</span>
+      {{ with .Params.type }}<span class="type-badge type-{{ . | urlize }}">{{ . }}</span>{{ end }}
+    </div>
   </header>
 
   {{ $pages := .Pages | complement (where .Pages "Params.status" "archived") }}

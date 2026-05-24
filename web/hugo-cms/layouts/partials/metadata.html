@@ -3,6 +3,10 @@
   <span class="type-badge type-{{ . | urlize }}">{{ . }}</span>
   {{ end }}
 
+  {{ if not .Title }}
+  <span class="warning-badge">missing title</span>
+  {{ end }}
+
   {{ with .Params.status }}
   {{ if ne . "active" }}
   <span class="status-badge status-{{ . }}">{{ . }}</span>

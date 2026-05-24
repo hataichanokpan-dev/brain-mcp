@@ -6,8 +6,18 @@
 <body>
   {{ partial "header.html" . }}
   <main class="main">
-    <div class="container">
+    <div class="app-shell">
+      <aside class="side-rail" aria-label="Sections">
+        <nav>
+          <a href="{{ "/" | relURL }}">All Pages</a>
+          {{ range .Site.Sections }}
+          <a href="{{ .RelPermalink }}">{{ partial "page-title.html" . }} <span>{{ len .Pages }}</span></a>
+          {{ end }}
+        </nav>
+      </aside>
+      <div class="container">
       {{ block "main" . }}{{ end }}
+      </div>
     </div>
   </main>
   {{ partial "footer.html" . }}

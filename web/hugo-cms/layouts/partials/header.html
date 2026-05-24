@@ -1,9 +1,9 @@
 <header class="site-header">
   <nav class="site-nav">
-    <a href="{{ "/" | relURL }}" class="site-title">{{ .Site.Title }}</a>
+    <a href="{{ "/" | relURL }}" class="site-title"><span class="site-mark"></span>{{ .Site.Title }}</a>
     <ul class="nav-links">
       {{ range .Site.Sections }}
-      <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+      <li><a href="{{ .RelPermalink }}">{{ partial "page-title.html" . }}</a></li>
       {{ end }}
     </ul>
     <div class="nav-search">

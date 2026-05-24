@@ -49,6 +49,10 @@ const HUGO_FILES: &[(&str, &str)] = &[
         include_str!("../web/hugo-cms/layouts/partials/page-list-item.html"),
     ),
     (
+        "layouts/partials/page-title.html",
+        include_str!("../web/hugo-cms/layouts/partials/page-title.html"),
+    ),
+    (
         "layouts/partials/superseded.html",
         include_str!("../web/hugo-cms/layouts/partials/superseded.html"),
     ),

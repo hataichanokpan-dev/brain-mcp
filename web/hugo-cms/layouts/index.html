@@ -1,12 +1,31 @@
 {{ define "main" }}
 <section class="home">
-  <h1>{{ .Site.Title }}</h1>
-  {{ with .Site.Params.description }}<p class="site-description">{{ . }}</p>{{ end }}
-
+  {{ $allPages := where .Site.RegularPages "Params.status" "!=" "archived" }}
   {{ $sections := .Site.Sections }}
+  <header class="home-header">
+    <div>
+      <p class="eyebrow">Knowledge Console</p>
+      <h1>{{ .Site.Title }}</h1>
+      {{ with .Site.Params.description }}<p class="site-description">{{ . }}</p>{{ end }}
+    </div>
+    <dl class="home-metrics">
+      <div>
+        <dt>Pages</dt>
+        <dd>{{ len $allPages }}</dd>
+      </div>
+      <div>
+        <dt>Sections</dt>
+        <dd>{{ len $sections }}</dd>
+      </div>
+    </dl>
+  </header>
+
   {{ range $sections }}
   <div class="home-section">
-    <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+    <div class="section-row-heading">
+      <h2><a href="{{ .RelPermalink }}">{{ partial "page-title.html" . }}</a></h2>
+      <span>{{ len .Pages }} pages</span>
+    </div>
     <ul class="page-list">
       {{ range first 5 .Pages.ByTitle }}
       {{ partial "page-list-item.html" . }}
@@ -18,10 +37,12 @@
   </div>
   {{ end }}
 
-  {{ $allPages := where .Site.RegularPages "Params.status" "!=" "archived" }}
   {{ if gt (len $allPages) 0 }}
   <div class="home-section">
-    <h2>All Pages</h2>
+    <div class="section-row-heading">
+      <h2>All Pages</h2>
+      <span>{{ len $allPages }} total</span>
+    </div>
     {{ $byType := $allPages.GroupByParam "type" }}
     {{ range $byType }}
     <div class="type-group compact">

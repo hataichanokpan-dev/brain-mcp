@@ -1,8 +1,11 @@
 <li class="page-item {{ if eq .Params.status "archived" }}archived{{ end }}">
-  <a href="{{ .RelPermalink }}" class="page-link">{{ .Title }}</a>
-  {{ with .Params.summary }}<span class="page-summary">— {{ . }}</span>{{ end }}
+  <div class="page-item-main">
+    <a href="{{ .RelPermalink }}" class="page-link">{{ partial "page-title.html" . }}</a>
+    {{ with .Params.summary }}<p class="page-summary">{{ . }}</p>{{ end }}
+  </div>
   <span class="page-meta">
     {{ with .Params.type }}<span class="type-badge type-{{ . | urlize }}">{{ . }}</span>{{ end }}
+    {{ if not .Title }}<span class="warning-badge">missing title</span>{{ end }}
     {{ with .Params.status }}{{ if ne . "active" }}<span class="status-badge status-{{ . }}">{{ . }}</span>{{ end }}{{ end }}
     {{ with .Params.confidence }}<span class="confidence">{{ printf "%.0f%%" (mul . 100) }}</span>{{ end }}
   </span>

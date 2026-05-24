@@ -1,7 +1,7 @@
 {{ define "main" }}
 <article class="page">
   <header class="page-header">
-    <h1 class="page-title">{{ .Title }}</h1>
+    <h1 class="page-title">{{ partial "page-title.html" . }}</h1>
     {{ if .Site.Params.showMetadata }}
       {{ partial "metadata.html" . }}
     {{ end }}
