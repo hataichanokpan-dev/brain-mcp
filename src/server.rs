@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::Result;
 use rmcp::ServiceExt;
 use rmcp::transport::streamable_http_server::session::local::{LocalSessionManager, SessionConfig};
+use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
@@ -63,10 +64,14 @@ async fn serve_http(
 
     let config = StreamableHttpServerConfig::default()
         .with_cancellation_token(cancel.child_token())
-        .with_allowed_hosts(serve_cfg.http_allowed_hosts.clone());
+        .with_allowed_hosts(serve_cfg.http_allowed_hosts.clone())
+        .with_stateful_mode(serve_cfg.mcp_stateful_mode)
+        .with_json_response(serve_cfg.mcp_json_response);
     let session_config = mcp_session_config(serve_cfg);
 
     tracing::info!(
+        stateful_mode = serve_cfg.mcp_stateful_mode,
+        json_response = serve_cfg.mcp_json_response,
         keep_alive_secs = ?session_config.keep_alive.map(|d| d.as_secs()),
         init_timeout_secs = ?session_config.init_timeout.map(|d| d.as_secs()),
         completed_cache_ttl_secs = session_config.completed_cache_ttl.as_secs(),
@@ -84,13 +89,23 @@ async fn serve_http(
     let mut session_manager = LocalSessionManager::default();
     session_manager.session_config = session_config;
 
-    let service: StreamableHttpService<McpServer, LocalSessionManager> = StreamableHttpService::new(
-        move || Ok(server.clone()),
-        Arc::new(session_manager),
-        config,
-    );
-
-    let router = axum::Router::new().nest_service("/mcp", service);
+    let router = if serve_cfg.mcp_stateful_mode {
+        let service: StreamableHttpService<McpServer, LocalSessionManager> =
+            StreamableHttpService::new(
+                move || Ok(server.clone()),
+                Arc::new(session_manager),
+                config,
+            );
+        axum::Router::new().nest_service("/mcp", service)
+    } else {
+        let service: StreamableHttpService<McpServer, NeverSessionManager> =
+            StreamableHttpService::new(
+                move || Ok(server.clone()),
+                Arc::new(NeverSessionManager::default()),
+                config,
+            );
+        axum::Router::new().nest_service("/mcp", service)
+    };
 
     let max_attempts = if serve_cfg.max_restarts == 0 {
         1
@@ -290,6 +305,8 @@ mod tests {
         assert_eq!(session.keep_alive, Some(Duration::from_secs(21_600)));
         assert_eq!(session.init_timeout, Some(Duration::from_secs(60)));
         assert_eq!(session.completed_cache_ttl, Duration::from_secs(60));
+        assert!(!cfg.mcp_stateful_mode);
+        assert!(cfg.mcp_json_response);
     }
 
     #[test]

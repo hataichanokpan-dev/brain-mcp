@@ -198,6 +198,14 @@ fn default_mcp_completed_cache_ttl_secs() -> u64 {
     60
 }
 
+fn default_mcp_stateful_mode() -> bool {
+    false
+}
+
+fn default_mcp_json_response() -> bool {
+    true
+}
+
 /// `[serve]` section — HTTP and ACP server configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServeConfig {
@@ -236,6 +244,12 @@ pub struct ServeConfig {
     /// Seconds to keep completed MCP request stream caches for late resume requests (default: 60).
     #[serde(default = "default_mcp_completed_cache_ttl_secs")]
     pub mcp_completed_cache_ttl_secs: u64,
+    /// Use stateful Streamable HTTP sessions (default: false).
+    #[serde(default = "default_mcp_stateful_mode")]
+    pub mcp_stateful_mode: bool,
+    /// Return direct JSON responses in stateless HTTP mode (default: true).
+    #[serde(default = "default_mcp_json_response")]
+    pub mcp_json_response: bool,
 }
 
 impl Default for ServeConfig {
@@ -252,6 +266,8 @@ impl Default for ServeConfig {
             mcp_session_keep_alive_secs: default_mcp_session_keep_alive_secs(),
             mcp_init_timeout_secs: default_mcp_init_timeout_secs(),
             mcp_completed_cache_ttl_secs: default_mcp_completed_cache_ttl_secs(),
+            mcp_stateful_mode: default_mcp_stateful_mode(),
+            mcp_json_response: default_mcp_json_response(),
         }
     }
 }
@@ -803,6 +819,8 @@ pub fn set_global_config_value(global: &mut GlobalConfig, key: &str, value: &str
         "serve.mcp_completed_cache_ttl_secs" => {
             global.serve.mcp_completed_cache_ttl_secs = value.parse()?;
         }
+        "serve.mcp_stateful_mode" => global.serve.mcp_stateful_mode = value.parse()?,
+        "serve.mcp_json_response" => global.serve.mcp_json_response = value.parse()?,
         "ingest.auto_commit" => global.ingest.auto_commit = value.parse()?,
         "history.follow" => global.history.follow = value.parse()?,
         "history.default_limit" => global.history.default_limit = value.parse()?,
@@ -856,6 +874,8 @@ pub fn get_config_value(resolved: &ResolvedConfig, global: &GlobalConfig, key: &
         "serve.mcp_completed_cache_ttl_secs" => {
             global.serve.mcp_completed_cache_ttl_secs.to_string()
         }
+        "serve.mcp_stateful_mode" => global.serve.mcp_stateful_mode.to_string(),
+        "serve.mcp_json_response" => global.serve.mcp_json_response.to_string(),
         "validation.type_strictness" => resolved.validation.type_strictness.clone(),
         "logging.log_path" => global.logging.log_path.clone(),
         "logging.log_rotation" => global.logging.log_rotation.clone(),
@@ -1022,6 +1042,8 @@ pub fn set_wiki_config_value(wiki_cfg: &mut WikiConfig, key: &str, value: &str) 
         | "serve.mcp_session_keep_alive_secs"
         | "serve.mcp_init_timeout_secs"
         | "serve.mcp_completed_cache_ttl_secs"
+        | "serve.mcp_stateful_mode"
+        | "serve.mcp_json_response"
         | "logging.log_path"
         | "logging.log_rotation"
         | "logging.log_max_files"

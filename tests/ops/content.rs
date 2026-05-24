@@ -36,6 +36,21 @@ fn content_read_no_frontmatter() {
 }
 
 #[test]
+fn content_read_bare_slug_falls_back_to_blueprint_sections() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+
+    match ops::content_read(&engine, "moe", None, true, false).unwrap() {
+        ops::ContentReadResult::Page(content) => {
+            assert!(content.contains("Mixture of Experts"));
+        }
+        _ => panic!("expected Page"),
+    }
+}
+
+#[test]
 fn content_write_and_read_back() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");

@@ -647,13 +647,13 @@ Claude Desktop uses stdio MCP by default and does not support the `url` field fo
   "mcpServers": {
     "brain": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://<host>:47778/mcp", "--allow-http"]
+      "args": ["-y", "mcp-remote@latest", "http://<host>:47778/mcp", "--allow-http", "--transport", "http-only"]
     }
   }
 }
 ```
 
-The `--allow-http` flag is required for non-HTTPS endpoints. For production use, place the server behind HTTPS (Tailscale, Cloudflare Tunnel, or a reverse proxy with TLS).
+The `--allow-http` flag is required for non-HTTPS endpoints. The `--transport http-only` flag avoids SSE fallback churn for this stateless request/response server. For production use, place the server behind HTTPS (Tailscale, Cloudflare Tunnel, or a reverse proxy with TLS).
 
 For remote MCP clients that idle for long periods, keep the HTTP MCP session
 alive longer than the default work gap:
@@ -665,6 +665,18 @@ llm-wiki config set serve.mcp_session_keep_alive_secs 21600 --global
 The default is 6 hours. If a bridge reports `Connection closed` after idle
 time, upgrade the server and raise this value rather than relying on manual
 client reinitialization.
+
+The HTTP MCP server defaults to stateless JSON responses:
+
+```bash
+llm-wiki config get serve.mcp_stateful_mode --global
+llm-wiki config get serve.mcp_json_response --global
+```
+
+Keep `serve.mcp_stateful_mode=false` for Claude Desktop through `mcp-remote`.
+Stateful mode is available for clients that explicitly need long-lived
+Streamable HTTP sessions, but it can leave old bridge processes waiting on stale
+sessions after a long desktop chat.
 
 ## Common Workflows
 

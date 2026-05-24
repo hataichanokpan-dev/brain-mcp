@@ -99,10 +99,12 @@ pub fn content_read(
     let wiki_root = engine.space(&entry.name)?.wiki_root.clone();
 
     if list_assets {
+        let slug = resolve_read_slug_with_fallback(&slug, &wiki_root)?;
         let assets = markdown::list_assets(&slug, &wiki_root)?;
         return Ok(ContentReadResult::Assets(assets));
     }
 
+    let slug = resolve_read_slug_with_fallback(&slug, &wiki_root)?;
     match resolve_read_target(slug.as_str(), &wiki_root)? {
         ReadTarget::Page(_) => {
             let wiki_cfg = config::load_wiki(&PathBuf::from(&entry.path)).unwrap_or_default();
@@ -147,6 +149,29 @@ pub fn canonical_section_for_type(type_name: &str) -> Option<&'static str> {
         "procedure" | "procedural" | "runbook" => Some("procedural"),
         _ => None,
     }
+}
+
+fn resolve_read_slug_with_fallback(slug: &Slug, wiki_root: &Path) -> Result<Slug> {
+    if resolve_read_target(slug.as_str(), wiki_root).is_ok() || slug.as_str().contains('/') {
+        return Ok(slug.clone());
+    }
+
+    for section in [
+        "concepts",
+        "entities",
+        "sources",
+        "projects",
+        "decisions",
+        "profile",
+        "procedural",
+    ] {
+        let candidate = Slug::try_from(format!("{section}/{slug}").as_str())?;
+        if resolve_read_target(candidate.as_str(), wiki_root).is_ok() {
+            return Ok(candidate);
+        }
+    }
+
+    Ok(slug.clone())
 }
 
 /// Prefix bare slugs with the canonical folder for their type.
