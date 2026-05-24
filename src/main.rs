@@ -641,8 +641,8 @@ fn main() -> Result<()> {
                     let report =
                         llm_wiki::web::install_hugo_site(&repo_root, &title, &wiki_root, force)?;
                     println!(
-                        "Installed web UI at {} ({} written, {} skipped)",
-                        report.site_path, report.written, report.skipped
+                        "Installed web UI at {} ({} written, {} skipped, {} content synced)",
+                        report.site_path, report.written, report.skipped, report.content_synced
                     );
                 }
                 WebAction::Serve { port, bind, drafts } => {
@@ -650,6 +650,8 @@ fn main() -> Result<()> {
                         llm_wiki::web::install_hugo_site(
                             &repo_root, &wiki_name, &wiki_root, false,
                         )?;
+                    } else {
+                        llm_wiki::web::sync_hugo_content(&repo_root, &wiki_root)?;
                     }
                     println!("Web UI: http://{bind}:{port}/");
                     let mut child =
@@ -664,6 +666,8 @@ fn main() -> Result<()> {
                         llm_wiki::web::install_hugo_site(
                             &repo_root, &wiki_name, &wiki_root, false,
                         )?;
+                    } else {
+                        llm_wiki::web::sync_hugo_content(&repo_root, &wiki_root)?;
                     }
                     let status = llm_wiki::web::build_hugo_site(&repo_root, minify)?;
                     if !status.success() {
@@ -726,6 +730,8 @@ fn main() -> Result<()> {
                     selected_wiki_paths(&config_path, cli.wiki.as_deref())?;
                 if !llm_wiki::web::is_installed(&repo_root) {
                     llm_wiki::web::install_hugo_site(&repo_root, &wiki_name, &wiki_root, false)?;
+                } else {
+                    llm_wiki::web::sync_hugo_content(&repo_root, &wiki_root)?;
                 }
                 println!("Web UI: http://{web_bind}:{web_port}/");
                 Some(llm_wiki::web::spawn_hugo_server(

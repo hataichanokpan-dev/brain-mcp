@@ -312,7 +312,14 @@ llm-wiki web build --wiki brain --minify
 llm-wiki web status --wiki brain
 ```
 
-Web UI ใช้ scaffold ที่ vendor มาจาก `geronimo-iia/llm-wiki-hugo-cms` และ mount content จาก `wiki/` โดยตรง จึงไม่มีการ copy Markdown ออกจาก source of truth.
+Web UI ใช้ scaffold ที่ vendor มาจาก `geronimo-iia/llm-wiki-hugo-cms` และสร้าง mirror สำหรับ Hugo ไว้ที่ `site/content/`. Source of truth ยังเป็นไฟล์ใน `wiki/`; mirror นี้มีไว้เพื่อแปลง section `index.md` เป็น Hugo `_index.md` เพื่อให้ไฟล์ลูกใน folder เดียวกันแสดงครบ เช่น `concepts/llm-wiki-pattern.md`.
+
+ถ้าอัปเดตจากเวอร์ชันเก่าที่เว็บเห็นไฟล์ไม่ครบ ให้ refresh scaffold และ content mirror:
+
+```bash
+llm-wiki web install --wiki brain --force
+sudo systemctl restart brain-mcp
+```
 
 ## Run As MCP Server
 

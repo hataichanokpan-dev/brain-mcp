@@ -2,10 +2,9 @@ baseURL = "https://example.github.io/my-wiki/"
 title = "My Wiki"
 languageCode = "en"
 
-# Point directly at the wiki content directory.
-# Option A (Hugo site at wiki repo root): contentDir = "wiki"
-# Option B (Hugo site in a site/ subdirectory):
-# contentDir is set via module mount below (supports excludeFiles patterns)
+# Point at the generated Hugo content mirror created by `llm-wiki web install`.
+# The mirror preserves wiki Markdown while converting section `index.md` files
+# to Hugo `_index.md` files so folders remain browseable sections.
 
 # Frontmatter field mapping
 [frontmatter]
@@ -18,10 +17,10 @@ languageCode = "en"
   author = "owner"
   type   = "type"
 
-# Mount wiki/ as the content directory, excluding non-content folders
+# Mount the generated content mirror, excluding non-content folders
 [module]
   [[module.mounts]]
-    source = "../wiki"
+    source = "content"
     target = "content"
     excludeFiles = [
       "inbox/**",
