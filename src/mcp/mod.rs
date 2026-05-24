@@ -99,43 +99,50 @@ impl ServerHandler for McpServer {
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
         let args = request.arguments.unwrap_or_default();
-        let result = tools::call(self, &request.name, &args);
+        let name = request.name.to_string();
+        let server = self.clone();
 
-        // Send resource update notifications for ingested pages
-        if !result.notify_uris.is_empty() {
-            let peer = context.peer.clone();
-            let uris = result.notify_uris.clone();
-            tokio::spawn(async move {
-                for uri in uris {
-                    if let Err(e) = peer
-                        .notify_resource_updated(rmcp::model::ResourceUpdatedNotificationParam {
-                            uri: uri.clone(),
-                        })
-                        .await
-                    {
-                        tracing::warn!(error = %e, uri = %uri, "resource notification failed");
+        async move {
+            let result = tokio::task::spawn_blocking(move || tools::call(&server, &name, &args))
+                .await
+                .map_err(|e| McpError::internal_error(format!("tool task failed: {e}"), None))?;
+
+            // Send resource update notifications for ingested pages.
+            if !result.notify_uris.is_empty() {
+                let peer = context.peer.clone();
+                let uris = result.notify_uris.clone();
+                tokio::spawn(async move {
+                    for uri in uris {
+                        if let Err(e) = peer
+                            .notify_resource_updated(
+                                rmcp::model::ResourceUpdatedNotificationParam { uri: uri.clone() },
+                            )
+                            .await
+                        {
+                            tracing::warn!(error = %e, uri = %uri, "resource notification failed");
+                        }
                     }
-                }
-            });
+                });
+            }
+
+            // Send resource list changed notification for space operations.
+            if result.notify_resources_changed {
+                let peer = context.peer.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = peer.notify_resource_list_changed().await {
+                        tracing::warn!(error = %e, "resource list changed notification failed");
+                    }
+                });
+            }
+
+            let tool_result = if result.is_error {
+                CallToolResult::error(result.content)
+            } else {
+                CallToolResult::success(result.content)
+            };
+
+            Ok(tool_result)
         }
-
-        // Send resource list changed notification for space operations
-        if result.notify_resources_changed {
-            let peer = context.peer.clone();
-            tokio::spawn(async move {
-                if let Err(e) = peer.notify_resource_list_changed().await {
-                    tracing::warn!(error = %e, "resource list changed notification failed");
-                }
-            });
-        }
-
-        let tool_result = if result.is_error {
-            CallToolResult::error(result.content)
-        } else {
-            CallToolResult::success(result.content)
-        };
-
-        std::future::ready(Ok(tool_result))
     }
 
     fn list_resources(

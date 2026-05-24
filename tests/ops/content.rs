@@ -53,6 +53,40 @@ fn content_write_and_read_back() {
 }
 
 #[test]
+fn content_commit_rehomes_bare_concept_slug() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = setup_wiki(dir.path(), "test");
+    let manager = WikiEngine::build(&config_path).unwrap();
+    let engine = manager.state.read().unwrap();
+    let space = engine.space("test").unwrap();
+
+    let root_file = space.wiki_root.join("thai-tts-voice-cloning.md");
+    std::fs::write(
+        &root_file,
+        "---\ntitle: \"Thai TTS\"\ntype: concept\nstatus: active\n---\n\nBody.\n",
+    )
+    .unwrap();
+
+    let hash = ops::content_commit(
+        &engine,
+        "test",
+        &["thai-tts-voice-cloning".to_string()],
+        false,
+        Some("commit thai tts"),
+    )
+    .unwrap();
+
+    assert!(!hash.is_empty());
+    assert!(!root_file.exists());
+    assert!(
+        space
+            .wiki_root
+            .join("concepts/thai-tts-voice-cloning.md")
+            .exists()
+    );
+}
+
+#[test]
 fn content_new_page() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");

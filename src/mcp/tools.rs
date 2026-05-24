@@ -132,10 +132,10 @@ pub fn tool_list() -> Vec<Tool> {
         ),
         Tool::new(
             "wiki_content_write",
-            "Write content to a page in the wiki tree",
+            "Write content to a page in the wiki tree; bare slugs are canonicalized from frontmatter type into the Blueprint layout",
             schema(
                 json!({
-                    "uri": str_prop("Slug or wiki:// URI"),
+                    "uri": str_prop("Slug or wiki:// URI. Prefer explicit paths such as concepts/topic; bare slugs are placed by frontmatter type."),
                     "content": str_prop("File content"),
                     "wiki": opt_str("Target wiki name"),
                 }),
@@ -144,10 +144,10 @@ pub fn tool_list() -> Vec<Tool> {
         ),
         Tool::new(
             "wiki_content_new",
-            "Create a page or section with scaffolded frontmatter",
+            "Create a page or section with scaffolded frontmatter; bare page slugs are placed in the Blueprint layout",
             schema(
                 json!({
-                    "uri": str_prop("Slug or wiki:// URI"),
+                    "uri": str_prop("Slug or wiki:// URI. Prefer explicit paths such as concepts/topic; bare page slugs default to concepts/."),
                     "section": opt_bool("Create a section instead of a page"),
                     "bundle": opt_bool("Create as bundle (folder + index.md)"),
                     "name": opt_str("Page title (default: derived from slug)"),
@@ -159,7 +159,7 @@ pub fn tool_list() -> Vec<Tool> {
         ),
         Tool::new(
             "wiki_content_commit",
-            "Commit pending changes to git",
+            "Commit pending changes to git; bare legacy slugs are rehomed to the Blueprint layout before commit when their frontmatter type is known",
             schema(
                 json!({
                     "slugs": opt_str("Comma-separated page slugs to commit (omit for all)"),

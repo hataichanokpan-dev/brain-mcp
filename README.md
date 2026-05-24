@@ -223,6 +223,23 @@ procedural/
   troubleshooting/
 ```
 
+MCP tools enforce this layout for common memory types. If an MCP client sends a
+bare slug such as `thai-tts-voice-cloning`, the server canonicalizes it before
+writing:
+
+| Frontmatter/tool type | Canonical location |
+| --- | --- |
+| `profile` | `profile/<slug>.md` |
+| `concept`, `page`, `note`, `doc`, `knowledge` | `concepts/<slug>.md` |
+| `entity`, `person`, `company`, `product`, `system`, `service` | `entities/<slug>.md` |
+| `source`, `paper`, `reference`, `url`, `article` | `sources/<slug>.md` |
+| `project` | `projects/<slug>.md` |
+| `decision`, `adr` | `decisions/<slug>.md` |
+| `procedure`, `procedural`, `runbook` | `procedural/<slug>.md` |
+
+Explicit paths still win. If a client sends `concepts/thai-tts-voice-cloning`,
+the server writes exactly there.
+
 Example profile page:
 
 ```markdown

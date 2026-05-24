@@ -10,6 +10,7 @@ use tantivy::{
 
 use crate::config;
 use crate::engine::EngineState;
+use crate::frontmatter;
 use crate::git;
 use crate::index_schema::IndexSchema;
 use crate::markdown;
@@ -127,6 +128,60 @@ pub struct WriteResult {
     pub bytes_written: usize,
     /// Absolute path of the written file.
     pub path: PathBuf,
+    /// Canonical slug that was written after applying content placement rules.
+    pub slug: String,
+}
+
+/// Return the canonical top-level folder for a frontmatter type.
+///
+/// The MCP layer uses this to keep model-generated pages inside the Blueprint
+/// store layout even when a client sends a bare slug such as `thai-tts`.
+pub fn canonical_section_for_type(type_name: &str) -> Option<&'static str> {
+    match type_name.trim().to_ascii_lowercase().as_str() {
+        "profile" => Some("profile"),
+        "concept" | "page" | "note" | "doc" | "knowledge" => Some("concepts"),
+        "entity" | "person" | "company" | "product" | "system" | "service" => Some("entities"),
+        "source" | "paper" | "reference" | "url" | "article" => Some("sources"),
+        "project" => Some("projects"),
+        "decision" | "adr" => Some("decisions"),
+        "procedure" | "procedural" | "runbook" => Some("procedural"),
+        _ => None,
+    }
+}
+
+/// Prefix bare slugs with the canonical folder for their type.
+///
+/// Slugs that already contain a path segment are treated as explicit and left
+/// unchanged. `wiki://` URIs preserve their wiki name while normalizing the
+/// slug portion.
+pub fn canonicalize_uri_for_type(uri: &str, type_name: Option<&str>) -> String {
+    let Some(type_name) = type_name else {
+        return uri.to_string();
+    };
+    let Some(section) = canonical_section_for_type(type_name) else {
+        return uri.to_string();
+    };
+
+    if let Some(rest) = uri.trim().strip_prefix("wiki://") {
+        let Some((wiki, slug)) = rest.split_once('/') else {
+            return uri.to_string();
+        };
+        if slug.contains('/') {
+            uri.to_string()
+        } else {
+            format!("wiki://{wiki}/{section}/{slug}")
+        }
+    } else if uri.trim().contains('/') {
+        uri.to_string()
+    } else {
+        format!("{section}/{}", uri.trim())
+    }
+}
+
+/// Infer the canonical URI for a content write from the page frontmatter.
+pub fn canonicalize_uri_for_content(uri: &str, content: &str) -> String {
+    let parsed = frontmatter::parse(content);
+    canonicalize_uri_for_type(uri, parsed.page_type())
 }
 
 /// Write content to a wiki page identified by slug or URI.
@@ -142,6 +197,7 @@ pub fn content_write(
     Ok(WriteResult {
         bytes_written: content.len(),
         path,
+        slug: slug.as_str().to_string(),
     })
 }
 
@@ -234,8 +290,12 @@ pub fn content_commit(
     }
 
     let mut paths = Vec::new();
+    let mut committed_slugs = Vec::new();
     for s in slugs {
-        let slug = Slug::try_from(s.as_str())?;
+        let (canonical_slug, extra_paths) = rehome_bare_slug_for_commit(s, &space.wiki_root)?;
+        paths.extend(extra_paths);
+        committed_slugs.push(canonical_slug.clone());
+        let slug = Slug::try_from(canonical_slug.as_str())?;
         let resolved = slug.resolve(&space.wiki_root)?;
         if resolved.file_name() == Some(std::ffi::OsStr::new("index.md")) {
             let bundle_dir = resolved.parent().unwrap();
@@ -252,7 +312,43 @@ pub fn content_commit(
         }
     }
     let path_refs: Vec<&Path> = paths.iter().map(|p| p.as_path()).collect();
-    let default_msg = format!("commit: {}", slugs.join(", "));
+    let default_msg = format!("commit: {}", committed_slugs.join(", "));
     let msg = message.unwrap_or(&default_msg);
     git::commit_paths(&space.repo_root, &path_refs, msg)
+}
+
+fn rehome_bare_slug_for_commit(slug: &str, wiki_root: &Path) -> Result<(String, Vec<PathBuf>)> {
+    if slug.contains('/') || slug.trim().starts_with("wiki://") {
+        return Ok((slug.to_string(), vec![]));
+    }
+
+    let old_path = wiki_root.join(format!("{slug}.md"));
+    if !old_path.is_file() {
+        return Ok((slug.to_string(), vec![]));
+    }
+
+    let content = std::fs::read_to_string(&old_path)?;
+    let parsed = frontmatter::parse(&content);
+    let canonical = canonicalize_uri_for_type(slug, parsed.page_type());
+    if canonical == slug {
+        return Ok((slug.to_string(), vec![]));
+    }
+
+    let new_path = wiki_root.join(format!("{canonical}.md"));
+    if new_path.is_file() {
+        let existing = std::fs::read_to_string(&new_path)?;
+        if existing == content {
+            std::fs::remove_file(&old_path)?;
+            return Ok((canonical, vec![old_path]));
+        }
+        bail!(
+            "bare slug \"{slug}\" belongs under \"{canonical}\", but both files exist; resolve the duplicate manually"
+        );
+    }
+
+    if let Some(parent) = new_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::rename(&old_path, &new_path)?;
+    Ok((canonical, vec![old_path]))
 }

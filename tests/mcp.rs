@@ -131,6 +131,62 @@ fn content_new_has_section_and_name_and_type_params() {
 }
 
 #[test]
+fn mcp_content_new_places_bare_page_in_concepts() {
+    let dir = tempfile::tempdir().unwrap();
+    let (config_path, repo_root) = setup_mcp_smoke_wiki(dir.path());
+    let manager = Arc::new(WikiEngine::build(&config_path).unwrap());
+    let server = McpServer::new(manager);
+
+    let result = tools::call(
+        &server,
+        "wiki_content_new",
+        &args(json!({
+            "uri": "thai-tts-voice-cloning",
+            "wiki": "test",
+            "type": "page",
+            "name": "Thai TTS"
+        })),
+    );
+
+    assert!(!result.is_error);
+    let text = result.content[0].as_text().unwrap().text.clone();
+    assert!(text.contains("\"slug\": \"concepts/thai-tts-voice-cloning\""));
+    assert!(
+        repo_root
+            .join("wiki/concepts/thai-tts-voice-cloning.md")
+            .exists()
+    );
+}
+
+#[test]
+fn mcp_content_write_places_bare_concept_in_concepts() {
+    let dir = tempfile::tempdir().unwrap();
+    let (config_path, repo_root) = setup_mcp_smoke_wiki(dir.path());
+    let manager = Arc::new(WikiEngine::build(&config_path).unwrap());
+    let server = McpServer::new(manager);
+
+    let result = tools::call(
+        &server,
+        "wiki_content_write",
+        &args(json!({
+            "uri": "thai-tts-voice-cloning",
+            "wiki": "test",
+            "content": "---\ntitle: \"Thai TTS\"\ntype: concept\nstatus: active\n---\n\nBody.\n"
+        })),
+    );
+
+    assert!(!result.is_error);
+    let text = result.content[0].as_text().unwrap().text.clone();
+    assert!(text.contains("\"slug\": \"concepts/thai-tts-voice-cloning\""));
+    assert!(
+        repo_root
+            .join("wiki/concepts/thai-tts-voice-cloning.md")
+            .exists()
+    );
+    assert!(!repo_root.join("wiki/thai-tts-voice-cloning.md").exists());
+}
+
+#[test]
 fn search_has_type_param() {
     let tools = tools::tool_list();
     let tool = tools.iter().find(|t| t.name == "wiki_search").unwrap();

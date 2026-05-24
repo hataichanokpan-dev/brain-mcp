@@ -53,7 +53,11 @@ pub fn commit_paths(repo_root: &Path, paths: &[&Path], message: &str) -> Result<
     let mut index = repo.index()?;
     for path in paths {
         let rel = path.strip_prefix(repo_root).unwrap_or(path);
-        index.add_path(rel)?;
+        if path.exists() {
+            index.add_path(rel)?;
+        } else {
+            index.remove_path(rel)?;
+        }
     }
     index.write()?;
     let tree_oid = index.write_tree()?;

@@ -193,14 +193,19 @@ pub fn handle_content_write(server: &McpServer, args: &Map<String, Value>) -> To
     let content = arg_str_req(args, "content")?;
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
+    let canonical_uri = ops::canonicalize_uri_for_content(&uri, &content);
 
-    let result = ops::content_write(&engine, &uri, wiki_flag.as_deref(), &content)
+    let result = ops::content_write(&engine, &canonical_uri, wiki_flag.as_deref(), &content)
         .map_err(|e| format!("{e}"))?;
-    ok_text(format!(
-        "Wrote {} bytes to {}",
-        result.bytes_written,
-        result.path.display()
-    ))
+    let response = serde_json::json!({
+        "bytes_written": result.bytes_written,
+        "path": result.path,
+        "slug": result.slug,
+        "uri": format!("wiki://{}/{}", engine.resolve_wiki_name(wiki_flag.as_deref()), result.slug),
+        "canonicalized_from": if canonical_uri != uri { Some(uri) } else { None },
+    });
+    let s = serde_json::to_string_pretty(&response).map_err(|e| format!("{e}"))?;
+    ok_text(s)
 }
 
 /// Handle `wiki_content_new` — create a new page or section with scaffolded frontmatter.
@@ -213,10 +218,15 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
 
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
+    let canonical_uri = if section {
+        uri.clone()
+    } else {
+        ops::canonicalize_uri_for_type(&uri, type_.as_deref().or(Some("concept")))
+    };
 
     let result = ops::content_new(
         &engine,
-        &uri,
+        &canonical_uri,
         wiki_flag.as_deref(),
         section,
         bundle,
@@ -230,6 +240,7 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
         "path":      result.path,
         "wiki_root": result.wiki_root,
         "bundle":    result.bundle,
+        "canonicalized_from": if canonical_uri != uri { Some(uri) } else { None },
     }))
     .map_err(|e| format!("{e}"))?;
     ok_text(s)
