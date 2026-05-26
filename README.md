@@ -331,6 +331,11 @@ llm-wiki web status --wiki brain
 
 Web UI ใช้ scaffold ที่ vendor มาจาก `geronimo-iia/llm-wiki-hugo-cms` และสร้าง mirror สำหรับ Hugo ไว้ที่ `site/content/`. Source of truth ยังเป็นไฟล์ใน `wiki/`; mirror นี้มีไว้เพื่อแปลง section `index.md` เป็น Hugo `_index.md` เพื่อให้ไฟล์ลูกใน folder เดียวกันแสดงครบ เช่น `concepts/llm-wiki-pattern.md`.
 
+When the combined service runs with `--web`, MCP writes, ingest, and index
+rebuilds refresh the Hugo content mirror automatically. Tool responses include
+`web_content_synced` when a web scaffold is installed, so clients can verify
+that browser-visible content was refreshed.
+
 ถ้าอัปเดตจากเวอร์ชันเก่าที่เว็บเห็นไฟล์ไม่ครบ ให้ refresh scaffold และ content mirror:
 
 ```bash

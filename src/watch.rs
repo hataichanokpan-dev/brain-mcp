@@ -81,6 +81,19 @@ pub async fn run_watcher(
                     let start = std::time::Instant::now();
                     match engine.schema_rebuild(wiki_name) {
                         Ok(()) => {
+                            if let Ok(state) = engine.state.read()
+                                && let Ok(space) = state.space(wiki_name)
+                                && let Err(e) = crate::web::sync_installed_hugo_content(
+                                    &space.repo_root,
+                                    &space.wiki_root,
+                                )
+                            {
+                                tracing::warn!(
+                                    wiki = %wiki_name,
+                                    error = %e,
+                                    "watch: web content sync failed",
+                                );
+                            }
                             tracing::info!(
                                 wiki = %wiki_name,
                                 duration_ms = start.elapsed().as_millis() as u64,
@@ -122,6 +135,16 @@ pub async fn run_watcher(
                     ) {
                         Ok(report) => {
                             if report.updated > 0 || report.deleted > 0 {
+                                if let Err(e) = crate::web::sync_installed_hugo_content(
+                                    &space.repo_root,
+                                    &space.wiki_root,
+                                ) {
+                                    tracing::warn!(
+                                        wiki = %wiki_name,
+                                        error = %e,
+                                        "watch: web content sync failed",
+                                    );
+                                }
                                 tracing::info!(
                                     wiki = %wiki_name,
                                     files = wiki_paths.len(),

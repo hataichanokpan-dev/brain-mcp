@@ -7,6 +7,15 @@ use crate::slug::{ReadTarget, WikiUri, resolve_read_target};
 use super::McpServer;
 use super::helpers::*;
 
+fn sync_web_content(server: &McpServer, wiki_name: &str) -> Result<Option<usize>, String> {
+    let (repo_root, wiki_root) = {
+        let engine = server.engine();
+        let space = engine.space(wiki_name).map_err(|e| format!("{e}"))?;
+        (space.repo_root.clone(), space.wiki_root.clone())
+    };
+    crate::web::sync_installed_hugo_content(&repo_root, &wiki_root).map_err(|e| format!("{e}"))
+}
+
 // ── Spaces ────────────────────────────────────────────────────────────────────
 
 /// Handle `wiki_spaces_create` — create a new wiki repository and register it.
@@ -193,16 +202,20 @@ pub fn handle_content_write(server: &McpServer, args: &Map<String, Value>) -> To
     let content = arg_str_req(args, "content")?;
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
+    let wiki_name = engine.resolve_wiki_name(wiki_flag.as_deref()).to_string();
     let canonical_uri = ops::canonicalize_uri_for_content(&uri, &content);
 
     let result = ops::content_write(&engine, &canonical_uri, wiki_flag.as_deref(), &content)
         .map_err(|e| format!("{e}"))?;
+    drop(engine);
+    let web_content_synced = sync_web_content(server, &wiki_name)?;
     let response = serde_json::json!({
         "bytes_written": result.bytes_written,
         "path": result.path,
         "slug": result.slug,
-        "uri": format!("wiki://{}/{}", engine.resolve_wiki_name(wiki_flag.as_deref()), result.slug),
+        "uri": format!("wiki://{}/{}", wiki_name, result.slug),
         "canonicalized_from": if canonical_uri != uri { Some(uri) } else { None },
+        "web_content_synced": web_content_synced,
     });
     let s = serde_json::to_string_pretty(&response).map_err(|e| format!("{e}"))?;
     ok_text(s)
@@ -218,6 +231,7 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
 
     let engine = server.engine();
     let wiki_flag = arg_str(args, "wiki");
+    let wiki_name = engine.resolve_wiki_name(wiki_flag.as_deref()).to_string();
     let canonical_uri = if section {
         uri.clone()
     } else {
@@ -234,6 +248,8 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
         type_.as_deref(),
     )
     .map_err(|e| format!("{e}"))?;
+    drop(engine);
+    let web_content_synced = sync_web_content(server, &wiki_name)?;
     let s = serde_json::to_string_pretty(&serde_json::json!({
         "uri":       result.uri,
         "slug":      result.slug,
@@ -241,6 +257,7 @@ pub fn handle_content_new(server: &McpServer, args: &Map<String, Value>) -> Tool
         "wiki_root": result.wiki_root,
         "bundle":    result.bundle,
         "canonicalized_from": if canonical_uri != uri { Some(uri) } else { None },
+        "web_content_synced": web_content_synced,
     }))
     .map_err(|e| format!("{e}"))?;
     ok_text(s)
@@ -502,8 +519,19 @@ pub fn handle_ingest(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
         (report, wiki_name, notify_uris)
     };
 
-    let _ = wiki_name; // used above for notify_uris
-    let s = serde_json::to_string_pretty(&report).map_err(|e| format!("{e}"))?;
+    let web_content_synced = if !dry_run {
+        sync_web_content(server, &wiki_name)?
+    } else {
+        None
+    };
+    let mut value = serde_json::to_value(&report).map_err(|e| format!("{e}"))?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "web_content_synced".to_string(),
+            serde_json::to_value(web_content_synced).map_err(|e| format!("{e}"))?,
+        );
+    }
+    let s = serde_json::to_string_pretty(&value).map_err(|e| format!("{e}"))?;
     Ok((vec![Content::text(s)], notify_uris))
 }
 
@@ -517,6 +545,7 @@ pub fn handle_index_rebuild(server: &McpServer, args: &Map<String, Value>) -> To
     };
 
     let report = ops::index_rebuild(&server.manager, &wiki_name).map_err(|e| format!("{e}"))?;
+    let web_content_synced = sync_web_content(server, &wiki_name)?;
 
     // Non-fatal: refresh the graph snapshot after index rebuild.
     {
@@ -536,7 +565,14 @@ pub fn handle_index_rebuild(server: &McpServer, args: &Map<String, Value>) -> To
         }
     }
 
-    let s = serde_json::to_string_pretty(&report).map_err(|e| format!("{e}"))?;
+    let mut value = serde_json::to_value(&report).map_err(|e| format!("{e}"))?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "web_content_synced".to_string(),
+            serde_json::to_value(web_content_synced).map_err(|e| format!("{e}"))?,
+        );
+    }
+    let s = serde_json::to_string_pretty(&value).map_err(|e| format!("{e}"))?;
     ok_text(s)
 }
 

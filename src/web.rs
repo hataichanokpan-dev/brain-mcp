@@ -205,6 +205,29 @@ pub fn sync_hugo_content(repo_root: &Path, wiki_root: &str) -> Result<usize> {
     Ok(synced)
 }
 
+/// Refresh an already installed Hugo content mirror for a mounted wiki.
+///
+/// Returns `Ok(None)` when the wiki repository has no installed web UI. This
+/// lets write paths keep working for CLI-only wikis while still keeping the web
+/// UI fresh when `<repo>/site/hugo.toml` exists.
+pub fn sync_installed_hugo_content(
+    repo_root: &Path,
+    wiki_root_path: &Path,
+) -> Result<Option<usize>> {
+    if !is_installed(repo_root) {
+        return Ok(None);
+    }
+    let wiki_root = wiki_root_path.strip_prefix(repo_root).with_context(|| {
+        format!(
+            "wiki root {} is not inside repo {}",
+            wiki_root_path.display(),
+            repo_root.display()
+        )
+    })?;
+    let wiki_root = wiki_root.to_string_lossy().replace('\\', "/");
+    Ok(Some(sync_hugo_content(repo_root, &wiki_root)?))
+}
+
 /// Return the installed Hugo version string, or `None` if Hugo is not on PATH.
 pub fn hugo_version() -> Result<Option<String>> {
     match Command::new("hugo").arg("version").output() {
@@ -406,5 +429,49 @@ mod tests {
                 .exists()
         );
         assert!(!tmp.path().join("site/content/concepts/index.md").exists());
+    }
+
+    #[test]
+    fn sync_installed_returns_none_without_site() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("wiki")).unwrap();
+
+        let synced = sync_installed_hugo_content(tmp.path(), &tmp.path().join("wiki")).unwrap();
+
+        assert_eq!(synced, None);
+    }
+
+    #[test]
+    fn sync_installed_refreshes_existing_site() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("wiki/projects")).unwrap();
+        std::fs::write(
+            tmp.path().join("wiki/projects/brain-mcp.md"),
+            "---\ntitle: brain-mcp\ntype: project\n---\n\nBody.\n",
+        )
+        .unwrap();
+        install_hugo_site(tmp.path(), "Brain", "wiki", false).unwrap();
+
+        std::fs::create_dir_all(tmp.path().join("wiki/procedural/development")).unwrap();
+        std::fs::write(
+            tmp.path()
+                .join("wiki/procedural/development/verify-brain-mcp.md"),
+            "---\ntitle: Verify brain-mcp\ntype: procedure\n---\n\nSteps.\n",
+        )
+        .unwrap();
+
+        let synced = sync_installed_hugo_content(tmp.path(), &tmp.path().join("wiki")).unwrap();
+
+        assert_eq!(synced, Some(2));
+        assert!(
+            tmp.path()
+                .join("site/content/projects/brain-mcp.md")
+                .exists()
+        );
+        assert!(
+            tmp.path()
+                .join("site/content/procedural/development/verify-brain-mcp.md")
+                .exists()
+        );
     }
 }
