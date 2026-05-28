@@ -72,6 +72,12 @@ git2       = { version = "0.21", default-features = false, features = ["vendored
 rmcp       = { version = "1.7", features = ["server", "transport-io", "transport-streamable-http-server"] }
 axum       = "0.8"
 
+# Concurrency (non-poisoning locks)
+parking_lot = "0.12"
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
 # ACP server
 agent-client-protocol = "0.12"
 tokio-util = { version = "0.7", features = ["compat"] }

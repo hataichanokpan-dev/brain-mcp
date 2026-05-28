@@ -17,7 +17,7 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use crate::engine::WikiEngine;
 
 use super::graph::run_graph;
-use super::helpers::{clear_active_run, resolve_wiki_name, send_text, session_cwd};
+use super::helpers::{clear_active_run, resolve_wiki_name, send_text, session_cwd, touch_session};
 use super::ingest::run_ingest;
 use super::lint::run_lint;
 use super::research::run_research;
@@ -32,6 +32,30 @@ pub async fn serve_acp(
 ) -> Result<()> {
     let (cx_tx, cx_rx) = tokio::sync::watch::channel::<Option<ConnectionTo<Client>>>(None);
     let cx_tx = Arc::new(cx_tx);
+
+    // Idle session cleanup task
+    {
+        let sessions = sessions.clone();
+        let ttl = std::time::Duration::from_secs(config.acp_session_ttl_secs);
+        tokio::spawn(async move {
+            if ttl.is_zero() {
+                return; // cleanup disabled
+            }
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                let removed = {
+                    let mut s = sessions.lock();
+                    let before = s.len();
+                    s.retain(|_, sess| sess.last_activity.elapsed() < ttl);
+                    before - s.len()
+                };
+                if removed > 0 {
+                    tracing::info!(removed = removed, "ACP: idle sessions cleaned up");
+                }
+            }
+        });
+    }
 
     // Push task: block until a cx is available, then forward watcher events to idle sessions
     {
@@ -50,7 +74,7 @@ pub async fn serve_acp(
             while let Some((wiki_name, msg)) = push_rx.recv().await {
                 // Refresh cx in case it was updated
                 let cx = cx_rx.borrow().clone().unwrap_or_else(|| cx.clone());
-                if let Ok(s) = sessions.lock() {
+                if let Some(s) = sessions.try_lock() {
                     for (id, sess) in s.iter() {
                         if sess.wiki.as_deref() == Some(&wiki_name) && sess.active_run.is_none() {
                             let sid = SessionId::new(id.clone());
@@ -93,7 +117,7 @@ pub async fn serve_acp(
                 let config = config.clone();
                 async move |req: NewSessionRequest, responder, _cx| {
                     {
-                        let sessions = sessions.lock().unwrap();
+                        let sessions = sessions.lock();
                         if sessions.len() >= config.acp_max_sessions {
                             return responder.respond_with_error(
                                 agent_client_protocol::schema::Error::new(
@@ -103,7 +127,7 @@ pub async fn serve_acp(
                             );
                         }
                     }
-                    let id = format!("session-{}", chrono::Utc::now().timestamp_millis());
+                    let id = uuid::Uuid::new_v4().to_string();
                     let _span =
                         tracing::info_span!("acp_new_session", session = %id).entered();
                     let wiki = req
@@ -119,8 +143,9 @@ pub async fn serve_acp(
                         created_at: chrono::Utc::now().timestamp() as u64,
                         active_run: None,
                         cancelled: Arc::new(AtomicBool::new(false)),
+                        last_activity: std::time::Instant::now(),
                     };
-                    sessions.lock().unwrap().insert(id.clone(), session);
+                    sessions.lock().insert(id.clone(), session);
                     tracing::info!(session = %id, "session created");
                     responder.respond(NewSessionResponse::new(SessionId::new(id)))
                 }
@@ -132,11 +157,12 @@ pub async fn serve_acp(
             {
                 let sessions = sessions.clone();
                 async move |req: LoadSessionRequest, responder, _cx| {
+                    let sid = req.session_id.to_string();
                     let exists = sessions
                         .lock()
-                        .map(|s| s.contains_key(&req.session_id.to_string()))
-                        .unwrap_or(false);
+                        .contains_key(&sid);
                     if exists {
+                        touch_session(&sessions, &sid);
                         responder.respond(LoadSessionResponse::new())
                     } else {
                         responder.respond_with_error(
@@ -159,25 +185,22 @@ pub async fn serve_acp(
                     let cwd = session_cwd(&mgr);
                     let infos: Vec<SessionInfo> = sessions
                         .lock()
-                        .map(|s| {
-                            s.values()
-                                .map(|sess| {
-                                    SessionInfo::new(
-                                        SessionId::new(sess.id.clone()),
-                                        cwd.clone(),
-                                    )
-                                    .title(if sess.active_run.is_some() {
-                                        Some(format!(
-                                            "[active] {}",
-                                            sess.label.clone().unwrap_or_default()
-                                        ))
-                                    } else {
-                                        sess.label.clone()
-                                    })
-                                })
-                                .collect()
+                        .values()
+                        .map(|sess| {
+                            SessionInfo::new(
+                                SessionId::new(sess.id.clone()),
+                                cwd.clone(),
+                            )
+                            .title(if sess.active_run.is_some() {
+                                Some(format!(
+                                    "[active] {}",
+                                    sess.label.clone().unwrap_or_default()
+                                ))
+                            } else {
+                                sess.label.clone()
+                            })
                         })
-                        .unwrap_or_default();
+                        .collect();
                     responder.respond(ListSessionsResponse::new(infos))
                 }
             },
@@ -203,19 +226,24 @@ pub async fn serve_acp(
 
                     let wiki_name = resolve_wiki_name(&mgr, &sessions, &req.session_id);
 
+                    // Update last activity
+                    touch_session(&sessions, &session_id_str);
+
                     // Reset cancellation flag for new prompt
-                    if let Ok(mut s) = sessions.lock()
-                        && let Some(sess) = s.get_mut(&session_id_str)
                     {
-                        sess.cancelled.store(false, Ordering::Relaxed);
+                        let mut s = sessions.lock();
+                        if let Some(sess) = s.get_mut(&session_id_str) {
+                            sess.cancelled.store(false, Ordering::Relaxed);
+                        }
                     }
 
                     // Mark active run
-                    if let Ok(mut s) = sessions.lock()
-                        && let Some(sess) = s.get_mut(&session_id_str)
                     {
-                        sess.active_run =
-                            Some(format!("run-{}", chrono::Utc::now().timestamp_millis()));
+                        let mut s = sessions.lock();
+                        if let Some(sess) = s.get_mut(&session_id_str) {
+                            sess.active_run =
+                                Some(format!("run-{}", chrono::Utc::now().timestamp_millis()));
+                        }
                     }
 
                     let query_text = if query.is_empty() { &text } else { query };
@@ -281,10 +309,11 @@ pub async fn serve_acp(
                 let sessions = sessions.clone();
                 async move |notif: CancelNotification, _cx| {
                     let id = notif.session_id.to_string();
-                    if let Ok(sessions) = sessions.lock()
-                        && let Some(sess) = sessions.get(&id)
                     {
-                        sess.cancelled.store(true, Ordering::Relaxed);
+                        let sessions = sessions.lock();
+                        if let Some(sess) = sessions.get(&id) {
+                            sess.cancelled.store(true, Ordering::Relaxed);
+                        }
                     }
                     clear_active_run(&sessions, &id);
                     Ok(())

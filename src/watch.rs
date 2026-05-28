@@ -81,8 +81,7 @@ pub async fn run_watcher(
                     let start = std::time::Instant::now();
                     match engine.schema_rebuild(wiki_name) {
                         Ok(()) => {
-                            if let Ok(state) = engine.state.read()
-                                && let Ok(space) = state.space(wiki_name)
+                            if let Ok(space) = engine.state.read().space(wiki_name)
                                 && let Err(e) = crate::web::sync_installed_hugo_content(
                                     &space.repo_root,
                                     &space.wiki_root,
@@ -115,7 +114,7 @@ pub async fn run_watcher(
                 let state = engine
                     .state
                     .read()
-                    .map_err(|_| anyhow::anyhow!("lock poisoned"))?;
+                    ;
                 for (wiki_name, space) in &state.spaces {
                     let wiki_paths: Vec<&PathBuf> = paths
                         .iter()
@@ -192,14 +191,15 @@ fn classify_event(
 }
 
 fn is_schema_path(path: &Path) -> bool {
-    // Check if path contains /schemas/ and ends with .json
-    let s = path.to_string_lossy();
-    s.contains("/schemas/") && path.extension().and_then(|e| e.to_str()) == Some("json")
+    path.components()
+        .any(|c| c.as_os_str() == "schemas")
+        && path.extension().and_then(|e| e.to_str()) == Some("json")
 }
 
 fn is_wiki_md(path: &Path) -> bool {
-    let s = path.to_string_lossy();
-    s.contains("/wiki/") && path.extension().and_then(|e| e.to_str()) == Some("md")
+    path.components()
+        .any(|c| c.as_os_str() == "wiki")
+        && path.extension().and_then(|e| e.to_str()) == Some("md")
 }
 
 fn start_notify_watcher(
@@ -210,7 +210,7 @@ fn start_notify_watcher(
     let state = engine
         .state
         .read()
-        .map_err(|_| anyhow::anyhow!("lock poisoned"))?;
+        ;
 
     // Build a map of watched paths to wiki names
     let mut watch_dirs: Vec<(String, PathBuf, PathBuf)> = Vec::new();
@@ -232,7 +232,10 @@ fn start_notify_watcher(
         }
         let event = match res {
             Ok(ev) => ev,
-            Err(_) => return,
+            Err(e) => {
+                tracing::error!(error = %e, "filesystem watcher error");
+                return;
+            }
         };
 
         // Only care about create, modify, rename

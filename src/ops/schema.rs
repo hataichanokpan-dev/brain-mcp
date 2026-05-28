@@ -162,8 +162,7 @@ pub fn schema_remove(
 
     let engine = manager
         .state
-        .read()
-        .map_err(|_| anyhow::anyhow!("lock poisoned"))?;
+        .read();
     let space = engine.space(wiki_name)?;
 
     // Count pages of this type in the index

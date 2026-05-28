@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+
 use anyhow::Result;
+use axum::extract::State;
+use axum::response::Json;
 use rmcp::ServiceExt;
 use rmcp::transport::streamable_http_server::session::local::{LocalSessionManager, SessionConfig};
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
+use serde::Serialize;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
@@ -59,6 +64,7 @@ async fn serve_http(
     port: u16,
     serve_cfg: &config::ServeConfig,
     cancel: CancellationToken,
+    engine: Arc<WikiEngine>,
 ) -> Result<()> {
     let addr: SocketAddr = ([0, 0, 0, 0], port).into();
 
@@ -96,7 +102,10 @@ async fn serve_http(
                 Arc::new(session_manager),
                 config,
             );
-        axum::Router::new().nest_service("/mcp", service)
+        axum::Router::new()
+            .nest_service("/mcp", service)
+            .route("/health", axum::routing::get(health_handler))
+            .with_state(engine.clone())
     } else {
         let service: StreamableHttpService<McpServer, NeverSessionManager> =
             StreamableHttpService::new(
@@ -104,7 +113,10 @@ async fn serve_http(
                 Arc::new(NeverSessionManager::default()),
                 config,
             );
-        axum::Router::new().nest_service("/mcp", service)
+        axum::Router::new()
+            .nest_service("/mcp", service)
+            .route("/health", axum::routing::get(health_handler))
+            .with_state(engine.clone())
     };
 
     let max_attempts = if serve_cfg.max_restarts == 0 {
@@ -159,7 +171,7 @@ pub async fn serve(
     let manager = Arc::new(WikiEngine::build(config_path)?);
 
     let (wiki_count, serve_cfg, http_enabled, resolved_port) = {
-        let engine = manager.state.read().map_err(|_| anyhow::anyhow!("lock"))?;
+        let engine = manager.state.read();
         let count = engine.spaces.len();
         let cfg = engine.config.serve.clone();
         let http = http_port.is_some() || cfg.http;
@@ -229,16 +241,51 @@ pub async fn serve(
         let watch_manager = manager.clone();
         let cancel_watch = cancel.clone();
         let debounce = {
-            let engine = manager.state.read().map_err(|_| anyhow::anyhow!("lock"))?;
+            let engine = manager.state.read();
             engine.config.watch.debounce_ms
         };
         let push_tx_watch = push_tx;
         Some(tokio::spawn(async move {
-            if let Err(e) =
-                crate::watch::run_watcher(watch_manager, debounce, cancel_watch, push_tx_watch)
-                    .await
-            {
-                tracing::error!(error = %e, "watcher error");
+            let max_retries: u32 = 5;
+            let mut backoff = Duration::from_secs(1);
+            let max_backoff = Duration::from_secs(30);
+            let hung_timeout = Duration::from_secs(300);
+            for attempt in 1..=max_retries {
+                let result = tokio::time::timeout(
+                    hung_timeout,
+                    crate::watch::run_watcher(
+                        watch_manager.clone(),
+                        debounce,
+                        cancel_watch.clone(),
+                        push_tx_watch.clone(),
+                    ),
+                )
+                .await;
+                match result {
+                    Ok(Ok(())) => {
+                        tracing::info!("watcher exited cleanly, restarting");
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!(error = %e, attempt, "watcher error, restarting");
+                    }
+                    Err(_) => {
+                        tracing::error!(attempt, "watcher hung (timeout), restarting");
+                    }
+                }
+                if cancel_watch.is_cancelled() {
+                    break;
+                }
+                if attempt < max_retries {
+                    tracing::info!(
+                        attempt,
+                        backoff_secs = backoff.as_secs(),
+                        "restarting watcher"
+                    );
+                    tokio::time::sleep(backoff).await;
+                    backoff = (backoff * 2).min(max_backoff);
+                } else {
+                    tracing::error!("watcher exhausted {max_retries} retries, giving up");
+                }
             }
         }))
     } else {
@@ -267,7 +314,7 @@ pub async fn serve(
         });
 
         if http_enabled {
-            serve_http(mcp_server, resolved_port, &serve_cfg, cancel).await?;
+            serve_http(mcp_server, resolved_port, &serve_cfg, cancel, manager.clone()).await?;
         } else {
             serve_stdio(mcp_server, shutdown_rx).await?;
         }
@@ -275,7 +322,7 @@ pub async fn serve(
         acp_handle.abort();
         let _ = acp_handle.await;
     } else if http_enabled {
-        serve_http(mcp_server, resolved_port, &serve_cfg, cancel).await?;
+        serve_http(mcp_server, resolved_port, &serve_cfg, cancel, manager.clone()).await?;
     } else {
         serve_stdio(mcp_server, shutdown_rx).await?;
     }
@@ -287,6 +334,43 @@ pub async fn serve(
 
     tracing::info!("server stopped");
     Ok(())
+}
+
+// ── Health endpoint ───────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct HealthResponse {
+    uptime_secs: u64,
+    wikis: Vec<WikiHealth>,
+}
+
+#[derive(Serialize)]
+struct WikiHealth {
+    name: String,
+    index_open: bool,
+    index_doc_count: u64,
+}
+
+static START_TIME: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+async fn health_handler(State(engine): State<Arc<WikiEngine>>) -> Json<HealthResponse> {
+    let start = *START_TIME.get_or_init(std::time::Instant::now);
+    let state = engine.state.read();
+    let mut wikis = Vec::new();
+    for (name, space) in &state.spaces {
+        let searcher = space.index_manager.searcher().ok();
+        let index_open = searcher.is_some();
+        let index_doc_count = searcher.map(|s| s.num_docs()).unwrap_or(0);
+        wikis.push(WikiHealth {
+            name: name.clone(),
+            index_open,
+            index_doc_count,
+        });
+    }
+    Json(HealthResponse {
+        uptime_secs: start.elapsed().as_secs(),
+        wikis,
+    })
 }
 
 #[cfg(test)]

@@ -8,6 +8,8 @@ pub mod tools;
 use std::future::Future;
 use std::sync::Arc;
 
+use helpers::{WikiError, err_code};
+
 use rmcp::ErrorData as McpError;
 use rmcp::ServerHandler;
 use rmcp::model::AnnotateAble;
@@ -38,15 +40,12 @@ impl McpServer {
     }
 
     /// Acquire a read guard on the engine state.
-    pub fn engine(&self) -> std::sync::RwLockReadGuard<'_, EngineState> {
-        self.manager.state.read().expect("engine lock poisoned")
+    pub fn engine(&self) -> parking_lot::RwLockReadGuard<'_, EngineState> {
+        self.manager.state.read()
     }
 
     fn list_wiki_resources(&self) -> Vec<rmcp::model::Resource> {
-        let engine = match self.manager.state.read() {
-            Ok(e) => e,
-            Err(_) => return vec![],
-        };
+        let engine = self.manager.state.read();
         let mut resources = Vec::new();
         for (wiki_name, space) in &engine.spaces {
             let walker = walkdir::WalkDir::new(&space.wiki_root)
@@ -103,9 +102,13 @@ impl ServerHandler for McpServer {
         let server = self.clone();
 
         async move {
-            let result = tokio::task::spawn_blocking(move || tools::call(&server, &name, &args))
-                .await
-                .map_err(|e| McpError::internal_error(format!("tool task failed: {e}"), None))?;
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(30),
+                tokio::task::spawn_blocking(move || tools::call(&server, &name, &args)),
+            )
+            .await
+            .map_err(|_| McpError::internal_error("tool call timed out after 30s", None))?
+            .map_err(|e| McpError::internal_error(format!("tool task failed: {e}"), None))?;
 
             // Send resource update notifications for ingested pages.
             if !result.notify_uris.is_empty() {
@@ -165,15 +168,7 @@ impl ServerHandler for McpServer {
     ) -> impl Future<Output = Result<ReadResourceResult, McpError>> + Send + '_ {
         let uri = &request.uri;
         let result = if uri.starts_with("wiki://") {
-            let engine = match self.manager.state.read() {
-                Ok(e) => e,
-                Err(_) => {
-                    return std::future::ready(Err(McpError::internal_error(
-                        "engine lock poisoned",
-                        None,
-                    )));
-                }
-            };
+            let engine = self.manager.state.read();
             match WikiUri::resolve(uri, None, &engine.config) {
                 Ok((entry, slug)) => {
                     let wiki_root = engine
@@ -186,16 +181,19 @@ impl ServerHandler for McpServer {
                                 .with_mime_type("text/markdown"),
                         ])),
                         Err(e) => Err(McpError::internal_error(
-                            format!("failed to read: {e}"),
+                            err_code(WikiError::InternalError, format!("failed to read: {e}")),
                             None,
                         )),
                     }
                 }
-                Err(e) => Err(McpError::invalid_params(format!("{e}"), None)),
+                Err(e) => Err(McpError::invalid_params(
+                    err_code(WikiError::InvalidUri, format!("{e}")),
+                    None,
+                )),
             }
         } else {
             Err(McpError::invalid_params(
-                format!("unsupported URI scheme: {uri}"),
+                err_code(WikiError::InvalidUri, format!("unsupported URI scheme: {uri}")),
                 None,
             ))
         };

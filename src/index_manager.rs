@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use parking_lot::RwLock;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -140,11 +141,7 @@ impl SpaceIndexManager {
     /// Return the current generation counter value.
     /// Incremented on every successful `reload_reader()` call.
     pub fn generation(&self) -> u64 {
-        self.inner
-            .read()
-            .unwrap()
-            .generation
-            .load(Ordering::Acquire)
+        self.inner.read().generation.load(Ordering::Acquire)
     }
 
     /// Open the index from disk and hold the reader.
@@ -186,10 +183,7 @@ impl SpaceIndexManager {
             .reader_builder()
             .reload_policy(tantivy::ReloadPolicy::Manual)
             .try_into()?;
-        let mut inner = self
-            .inner
-            .write()
-            .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+        let mut inner = self.inner.write();
         inner.tantivy_index = Some(index);
         inner.index_reader = Some(reader);
         Ok(())
@@ -197,10 +191,7 @@ impl SpaceIndexManager {
 
     /// Get a searcher. Cheap — arc clone of current segment set.
     pub fn searcher(&self) -> Result<Searcher> {
-        let inner = self
-            .inner
-            .read()
-            .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+        let inner = self.inner.read();
         inner
             .index_reader
             .as_ref()
@@ -211,10 +202,7 @@ impl SpaceIndexManager {
     /// Reload the held IndexReader so searchers see the latest commit.
     /// No-op if the reader is not yet open. Safe to call after every write.
     fn reload_reader(&self) -> Result<()> {
-        let inner = self
-            .inner
-            .read()
-            .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+        let inner = self.inner.read();
         if let Some(ref r) = inner.index_reader {
             r.reload()?;
         }
@@ -224,10 +212,7 @@ impl SpaceIndexManager {
 
     /// Get a writer from the held index, or open from disk if not held.
     fn writer(&self) -> Result<IndexWriter> {
-        let inner = self
-            .inner
-            .read()
-            .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+        let inner = self.inner.read();
         if let Some(ref idx) = inner.tantivy_index {
             Ok(idx.writer(50_000_000)?)
         } else {
@@ -264,10 +249,7 @@ impl SpaceIndexManager {
 
         let search_dir = self.index_path.join("search-index");
         {
-            let mut inner = self
-                .inner
-                .write()
-                .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+            let mut inner = self.inner.write();
             inner.tantivy_index = None;
             inner.index_reader = None;
         }
@@ -332,10 +314,7 @@ impl SpaceIndexManager {
             .reload_policy(tantivy::ReloadPolicy::Manual)
             .try_into()?;
         {
-            let mut inner = self
-                .inner
-                .write()
-                .map_err(|_| anyhow::anyhow!("index lock poisoned"))?;
+            let mut inner = self.inner.write();
             inner.tantivy_index = Some(index);
             inner.index_reader = Some(reader);
             inner.generation.fetch_add(1, Ordering::AcqRel);

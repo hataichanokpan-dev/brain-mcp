@@ -32,10 +32,7 @@ pub fn step_search(
     )?;
 
     let results = {
-        let engine = manager
-            .state
-            .read()
-            .map_err(|_| agent_client_protocol::schema::Error::internal_error())?;
+        let engine = manager.state.read();
         ops::search(
             &engine,
             wiki_name,
@@ -93,10 +90,7 @@ pub fn step_read(
     )?;
 
     let result = {
-        let engine = manager
-            .state
-            .read()
-            .map_err(|_| agent_client_protocol::schema::Error::internal_error())?;
+        let engine = manager.state.read();
         ops::content_read(&engine, slug, Some(wiki_name), false, false)
     };
 

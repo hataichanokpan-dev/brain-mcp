@@ -29,10 +29,7 @@ pub fn step_lint(
     send_tool_call(cx, session_id, &tool_id, &label, ToolKind::Other)?;
 
     let result = {
-        let engine = manager
-            .state
-            .read()
-            .map_err(|_| agent_client_protocol::schema::Error::internal_error())?;
+        let engine = manager.state.read();
         ops::run_lint(&engine, wiki_name, rules, None)
     };
 

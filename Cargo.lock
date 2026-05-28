@@ -1780,6 +1780,7 @@ dependencies = [
  "hex",
  "jsonschema",
  "notify",
+ "parking_lot",
  "petgraph",
  "petgraph-live",
  "regex",
@@ -1796,6 +1797,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
  "walkdir",
 ]
 

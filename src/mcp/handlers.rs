@@ -148,7 +148,7 @@ pub fn handle_config(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
                 .map_err(|e| format!("{e}"))?;
             ok_text(msg)
         }
-        _ => Err(format!("unknown config action: {action}")),
+        _ => Err(err_code(WikiError::InvalidUri, format!("unknown config action: {action}"))),
     }
 }
 
@@ -552,15 +552,17 @@ pub fn handle_index_rebuild(server: &McpServer, args: &Map<String, Value>) -> To
         let engine = server.engine();
         if let Ok(space) = engine.space(&wiki_name) {
             let current_gen = space.index_manager.generation();
-            if let Ok(searcher) = space.index_manager.searcher() {
-                let _ = space.graph_cache.rebuild(current_gen, || {
+            if let Ok(searcher) = space.index_manager.searcher()
+                && let Err(e) = space.graph_cache.rebuild(current_gen, || {
                     crate::graph::build_graph(
                         &searcher,
                         &space.index_schema,
                         &crate::graph::GraphFilter::default(),
                         &space.type_registry,
                     )
-                });
+                })
+            {
+                tracing::error!(wiki = %wiki_name, error = %e, "graph cache rebuild failed");
             }
         }
     }
@@ -738,7 +740,7 @@ pub fn handle_schema(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
                 ok_text(issues.join("\n"))
             }
         }
-        _ => Err(format!("unknown action: {action}")),
+        _ => Err(err_code(WikiError::InvalidUri, format!("unknown action: {action}"))),
     }
 }
 

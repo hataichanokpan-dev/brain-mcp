@@ -28,10 +28,7 @@ pub fn step_ingest(
     )?;
 
     let result = {
-        let engine = manager
-            .state
-            .read()
-            .map_err(|_| agent_client_protocol::schema::Error::internal_error())?;
+        let engine = manager.state.read();
         ops::ingest(&engine, manager, path, false, wiki_name)
     };
 

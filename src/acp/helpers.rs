@@ -70,18 +70,16 @@ pub fn resolve_wiki_name(
     sessions: &Sessions,
     session_id: &SessionId,
 ) -> String {
-    let session_wiki = sessions.lock().ok().and_then(|s| {
-        s.get(&session_id.to_string())
-            .and_then(|sess| sess.wiki.clone())
-    });
-    let engine = manager.state.read().expect("engine lock poisoned");
+    let session_wiki = sessions.lock().get(&session_id.to_string())
+        .and_then(|sess| sess.wiki.clone());
+    let engine = manager.state.read();
     engine
         .resolve_wiki_name(session_wiki.as_deref())
         .to_string()
 }
 
 pub fn session_cwd(manager: &WikiEngine) -> PathBuf {
-    let engine = manager.state.read().expect("engine lock poisoned");
+    let engine = manager.state.read();
     let name = engine.default_wiki_name();
     engine
         .space(name)
@@ -93,7 +91,6 @@ pub fn session_cwd(manager: &WikiEngine) -> PathBuf {
 pub fn get_cancelled(sessions: &Sessions, session_id: &str) -> Option<Arc<AtomicBool>> {
     sessions
         .lock()
-        .ok()?
         .get(session_id)?
         .cancelled
         .clone()
@@ -101,9 +98,17 @@ pub fn get_cancelled(sessions: &Sessions, session_id: &str) -> Option<Arc<Atomic
 }
 
 pub fn clear_active_run(sessions: &Sessions, session_id: &str) {
-    if let Ok(mut s) = sessions.lock()
-        && let Some(sess) = s.get_mut(session_id)
-    {
+    let mut s = sessions.lock();
+    if let Some(sess) = s.get_mut(session_id) {
         sess.active_run = None;
+        sess.last_activity = std::time::Instant::now();
+    }
+}
+
+/// Update `last_activity` for a session. No-op if the session doesn't exist.
+pub fn touch_session(sessions: &Sessions, session_id: &str) {
+    let mut s = sessions.lock();
+    if let Some(sess) = s.get_mut(session_id) {
+        sess.last_activity = std::time::Instant::now();
     }
 }

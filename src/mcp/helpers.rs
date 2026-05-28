@@ -1,3 +1,5 @@
+use std::fmt;
+
 use std::path::Path;
 
 use rmcp::model::Content;
@@ -5,6 +7,48 @@ use serde_json::{Map, Value};
 
 use crate::engine::EngineState;
 use crate::slug::Slug;
+
+// ── Structured error codes ─────────────────────────────────────────────────────
+
+/// Structured error codes for MCP tool responses.
+#[derive(Debug, Clone)]
+pub enum WikiError {
+    WikiNotFound,
+    IndexNotOpen,
+    InvalidUri,
+    LockFailed,
+    InternalError,
+}
+
+impl WikiError {
+    /// Return the machine-readable error code string.
+    pub fn code(&self) -> &'static str {
+        match self {
+            WikiError::WikiNotFound => "WIKI_NOT_FOUND",
+            WikiError::IndexNotOpen => "INDEX_NOT_OPEN",
+            WikiError::InvalidUri => "INVALID_URI",
+            WikiError::LockFailed => "LOCK_FAILED",
+            WikiError::InternalError => "INTERNAL_ERROR",
+        }
+    }
+}
+
+impl fmt::Display for WikiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WikiError::WikiNotFound => write!(f, "[{}] wiki not found", self.code()),
+            WikiError::IndexNotOpen => write!(f, "[{}] index is not open", self.code()),
+            WikiError::InvalidUri => write!(f, "[{}] invalid URI", self.code()),
+            WikiError::LockFailed => write!(f, "[{}] lock acquisition failed", self.code()),
+            WikiError::InternalError => write!(f, "[{}] internal error", self.code()),
+        }
+    }
+}
+
+/// Format a structured error message with code prefix.
+pub fn err_code(error: WikiError, detail: impl fmt::Display) -> String {
+    format!("{error}: {detail}")
+}
 
 // ── ToolResult ────────────────────────────────────────────────────────────────
 

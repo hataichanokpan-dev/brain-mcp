@@ -18,19 +18,79 @@ fn make_signature(repo: &Repository) -> Result<Signature<'_>> {
         .context("failed to create git signature")
 }
 
+const MAX_RETRIES: u32 = 3;
+const BACKOFF_MS: &[u64] = &[100, 200, 400];
+
 /// Stage all files and commit. Returns empty string if nothing to commit.
 pub fn commit(repo_root: &Path, message: &str) -> Result<String> {
+    do_commit(repo_root, message, |repo| {
+        let mut index = repo.index()?;
+        index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
+        index.write()?;
+        let tree_oid = index.write_tree()?;
+        let tree = repo.find_tree(tree_oid)?;
+        let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+        Ok((tree, tree_oid, parent))
+    })
+}
+
+/// Stage specific paths and commit. Returns empty string if nothing to commit.
+pub fn commit_paths(repo_root: &Path, paths: &[&Path], message: &str) -> Result<String> {
+    do_commit(repo_root, message, |repo| {
+        let mut index = repo.index()?;
+        for path in paths {
+            let rel = path.strip_prefix(repo_root).unwrap_or(path);
+            if path.exists() {
+                index.add_path(rel)?;
+            } else {
+                index.remove_path(rel)?;
+            }
+        }
+        index.write()?;
+        let tree_oid = index.write_tree()?;
+        let tree = repo.find_tree(tree_oid)?;
+        let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+        Ok((tree, tree_oid, parent))
+    })
+}
+
+/// Shared commit logic with lock-contention retry.
+fn do_commit<F>(repo_root: &Path, message: &str, stage: F) -> Result<String>
+where
+    F: Fn(&Repository) -> Result<(git2::Tree<'_>, git2::Oid, Option<git2::Commit<'_>>)>,
+{
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        match try_commit(repo_root, message, &stage) {
+            Ok(result) => return Ok(result),
+            Err(e) if attempt < MAX_RETRIES && is_lock_error(&e) => {
+                let backoff = BACKOFF_MS[(attempt - 1) as usize];
+                tracing::warn!(
+                    "git lock contention, retry {attempt}/{} after {backoff}ms",
+                    MAX_RETRIES
+                );
+                std::thread::sleep(std::time::Duration::from_millis(backoff));
+            }
+            Err(e) => {
+                if is_lock_error(&e) {
+                    try_remove_lock(repo_root);
+                }
+                return Err(e);
+            }
+        }
+    }
+}
+
+fn try_commit<F>(repo_root: &Path, message: &str, stage: &F) -> Result<String>
+where
+    F: Fn(&Repository) -> Result<(git2::Tree<'_>, git2::Oid, Option<git2::Commit<'_>>)>,
+{
     let repo = Repository::open(repo_root)
         .with_context(|| format!("failed to open repo at {}", repo_root.display()))?;
-
     let sig = make_signature(&repo)?;
-    let mut index = repo.index()?;
-    index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
-    index.write()?;
-    let tree_oid = index.write_tree()?;
-    let tree = repo.find_tree(tree_oid)?;
 
-    let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+    let (tree, tree_oid, parent) = stage(&repo)?;
 
     // Skip if tree matches parent (nothing changed)
     if let Some(ref p) = parent
@@ -44,36 +104,18 @@ pub fn commit(repo_root: &Path, message: &str) -> Result<String> {
     Ok(oid.to_string())
 }
 
-/// Stage specific paths and commit. Returns empty string if nothing to commit.
-pub fn commit_paths(repo_root: &Path, paths: &[&Path], message: &str) -> Result<String> {
-    let repo = Repository::open(repo_root)
-        .with_context(|| format!("failed to open repo at {}", repo_root.display()))?;
+fn is_lock_error(err: &anyhow::Error) -> bool {
+    let msg = format!("{err:#}");
+    msg.to_lowercase().contains("lock")
+        || msg.contains(".git/index.lock")
+}
 
-    let sig = make_signature(&repo)?;
-    let mut index = repo.index()?;
-    for path in paths {
-        let rel = path.strip_prefix(repo_root).unwrap_or(path);
-        if path.exists() {
-            index.add_path(rel)?;
-        } else {
-            index.remove_path(rel)?;
-        }
+fn try_remove_lock(repo_root: &Path) {
+    let lock_path = repo_root.join(".git").join("index.lock");
+    if lock_path.exists() {
+        tracing::error!("removing stale git lock file: {}", lock_path.display());
+        let _ = std::fs::remove_file(&lock_path);
     }
-    index.write()?;
-    let tree_oid = index.write_tree()?;
-    let tree = repo.find_tree(tree_oid)?;
-
-    let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
-
-    if let Some(ref p) = parent
-        && p.tree_id() == tree_oid
-    {
-        return Ok(String::new());
-    }
-
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    let oid = repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
-    Ok(oid.to_string())
 }
 
 /// Get current HEAD commit hash. Returns None if repo has no commits.

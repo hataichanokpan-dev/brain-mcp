@@ -1,12 +1,25 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use toml;
 
 use crate::config::{GlobalConfig, WikiEntry, load_global, save_global};
 use crate::default_schemas::default_schemas;
 use crate::git;
+
+/// Canonicalize a path and strip the `\\?\` UNC prefix that Windows returns.
+fn normalize_canonical(path: &Path) -> PathBuf {
+    let p = path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf());
+    let s = p.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        p
+    }
+}
 
 // ── CreateReport ──────────────────────────────────────────────────────────────
 
@@ -57,7 +70,7 @@ pub fn create(
         std::fs::create_dir_all(path)?;
         created = true;
     }
-    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let path = normalize_canonical(path);
     let wiki_root = wiki_root.unwrap_or("wiki");
     let mut committed = false;
 
@@ -147,7 +160,7 @@ pub fn register_existing(
     if !path.exists() {
         bail!("path \"{}\" does not exist", path.display());
     }
-    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let path = normalize_canonical(path);
 
     // Read existing wiki.toml wiki_root if present
     let existing_toml_root: Option<String> = {
@@ -316,10 +329,8 @@ pub fn validate_wiki_root(repo_path: &Path, wiki_root: &str) -> Result<()> {
             candidate.display()
         );
     }
-    let repo_abs = std::fs::canonicalize(repo_path)
-        .with_context(|| format!("cannot canonicalize repo path {}", repo_path.display()))?;
-    let root_abs = std::fs::canonicalize(&candidate)
-        .with_context(|| format!("cannot canonicalize wiki_root {}", candidate.display()))?;
+    let repo_abs = normalize_canonical(repo_path);
+    let root_abs = normalize_canonical(&candidate);
     if !root_abs.starts_with(&repo_abs) {
         bail!(
             "wiki_root must be inside the repository (resolved to {}, repo is {})",

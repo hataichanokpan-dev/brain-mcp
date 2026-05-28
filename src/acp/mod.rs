@@ -7,7 +7,9 @@ mod server;
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use agent_client_protocol::schema::{ContentBlock, PromptRequest};
 
@@ -29,6 +31,8 @@ pub struct AcpSession {
     pub active_run: Option<String>,
     /// Cooperative cancellation flag. Set by cancel handler; polled by workflow steps.
     pub cancelled: Arc<AtomicBool>,
+    /// Monotonic instant of last activity — used for idle cleanup.
+    pub last_activity: std::time::Instant,
 }
 
 /// Shared map of active ACP sessions, keyed by session ID.
