@@ -148,7 +148,10 @@ pub fn handle_config(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
                 .map_err(|e| format!("{e}"))?;
             ok_text(msg)
         }
-        _ => Err(err_code(WikiError::InvalidUri, format!("unknown config action: {action}"))),
+        _ => Err(err_code(
+            WikiError::InvalidUri,
+            format!("unknown config action: {action}"),
+        )),
     }
 }
 
@@ -740,7 +743,10 @@ pub fn handle_schema(server: &McpServer, args: &Map<String, Value>) -> ToolHandl
                 ok_text(issues.join("\n"))
             }
         }
-        _ => Err(err_code(WikiError::InvalidUri, format!("unknown action: {action}"))),
+        _ => Err(err_code(
+            WikiError::InvalidUri,
+            format!("unknown action: {action}"),
+        )),
     }
 }
 

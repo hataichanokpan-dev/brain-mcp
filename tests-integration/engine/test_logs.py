@@ -5,7 +5,9 @@ def _logs_dir(wiki_env):
 def _seed_log(wiki_env):
     logs = _logs_dir(wiki_env)
     logs.mkdir(parents=True, exist_ok=True)
-    (logs / "2000-01-01.log").write_text("line1\nline2\nline3\nline4\nline5\n")
+    (logs / "2000-01-01.log").write_text(
+        "line1\nline2\nline3\nline4\nline5\n", encoding="utf-8"
+    )
 
 
 def test_logs_list_returns_files(wiki_env):

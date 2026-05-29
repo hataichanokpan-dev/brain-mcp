@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.14] - 2026-05-29
+
+### Added
+
+- **Production hardening** — added GET `/health`, ACP session TTL cleanup with UUID session IDs, MCP request timeout handling, and structured MCP error codes.
+
+### Changed
+
+- **Locking resilience** — replaced poisoning-prone standard locks with `parking_lot` locks across server state paths.
+- **Watcher resilience** — added watcher self-restart and dead-watcher detection for long-running `serve --watch` deployments.
+- **Diagnostics** — replaced silent error swallowing with structured logging in server, watcher, MCP, and ACP paths.
+
+### Fixed
+
+- **Windows compatibility** — normalized path matching, `HOME` handling, and UNC prefix behavior in server and tests.
+- **Git contention** — added retry handling for transient `.git/index.lock` contention.
+- **Readiness checks** — updated Rust tests for non-poisoning lock guards and made Python integration file IO explicitly UTF-8 so release checks pass on Windows.
+
 ## [0.4.1] -  2026-05-08
 
 ### Added

@@ -33,7 +33,7 @@ fn engine_builds_from_config() {
     let (config_path, _) = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     assert_eq!(engine.default_wiki_name(), "test");
     assert!(engine.spaces.contains_key("test"));
@@ -47,7 +47,7 @@ fn engine_builds_with_no_wikis() {
     fs::write(&config_path, "[global]\ndefault_wiki = \"\"\n").unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     assert!(engine.spaces.is_empty());
 }
@@ -58,7 +58,7 @@ fn engine_builds_with_missing_config() {
     let config_path = dir.path().join("nonexistent").join("config.toml");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     assert!(engine.spaces.is_empty());
 }
@@ -71,7 +71,7 @@ fn engine_space_returns_mounted_wiki() {
     let (config_path, _) = setup_wiki(dir.path(), "research");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let space = engine.space("research").unwrap();
     assert_eq!(space.name, "research");
@@ -84,7 +84,7 @@ fn engine_space_errors_on_unknown() {
     let (config_path, _) = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     assert!(engine.space("nonexistent").is_err());
 }
@@ -95,7 +95,7 @@ fn resolve_wiki_name_uses_default() {
     let (config_path, _) = setup_wiki(dir.path(), "research");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     assert_eq!(engine.resolve_wiki_name(None), "research");
     assert_eq!(engine.resolve_wiki_name(Some("other")), "other");
@@ -107,7 +107,7 @@ fn index_path_derived_from_state_dir() {
     let (config_path, _) = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let idx_path = engine.index_path_for("test");
     assert!(idx_path.starts_with(dir.path().join("state")));
@@ -175,11 +175,11 @@ fn engine_mounts_wiki_with_custom_wiki_root() {
     llm_wiki::git::commit(&wiki_path, "add skill page").unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.space("skills").unwrap();
 
-    let expected_wiki_root = wiki_path.canonicalize().unwrap().join("skills");
-    assert_eq!(space.wiki_root, expected_wiki_root);
+    let expected_wiki_root = wiki_path.join("skills").canonicalize().unwrap();
+    assert_eq!(space.wiki_root.canonicalize().unwrap(), expected_wiki_root);
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn engine_indexes_custom_wiki_root_fixture() {
         .unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine_guard = manager.state.read().unwrap();
+    let engine_guard = manager.state.read();
     let space = engine_guard.space("alt-root").unwrap();
 
     assert!(space.wiki_root.ends_with("content"));
@@ -225,7 +225,7 @@ fn content_read_works_with_custom_wiki_root() {
     llm_wiki::git::commit(&wiki_path, "add page").unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result =
         llm_wiki::ops::content_read(&engine, "wiki://skills/bootstrap", None, false, false)

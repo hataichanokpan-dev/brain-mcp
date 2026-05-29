@@ -193,7 +193,10 @@ impl ServerHandler for McpServer {
             }
         } else {
             Err(McpError::invalid_params(
-                err_code(WikiError::InvalidUri, format!("unsupported URI scheme: {uri}")),
+                err_code(
+                    WikiError::InvalidUri,
+                    format!("unsupported URI scheme: {uri}"),
+                ),
                 None,
             ))
         };

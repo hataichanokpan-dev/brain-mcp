@@ -26,7 +26,7 @@ def test_schema_validate(wiki_env):
 
 def test_schema_add_and_remove(wiki_env):
     schema_file = wiki_env.tmp / "test-custom.json"
-    schema_file.write_text(CUSTOM_SCHEMA)
+    schema_file.write_text(CUSTOM_SCHEMA, encoding="utf-8")
 
     result = wiki_env.run("schema", "add", "test-custom", str(schema_file))
     assert "copied" in result.stdout

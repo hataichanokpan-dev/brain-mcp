@@ -70,7 +70,9 @@ pub fn resolve_wiki_name(
     sessions: &Sessions,
     session_id: &SessionId,
 ) -> String {
-    let session_wiki = sessions.lock().get(&session_id.to_string())
+    let session_wiki = sessions
+        .lock()
+        .get(&session_id.to_string())
         .and_then(|sess| sess.wiki.clone());
     let engine = manager.state.read();
     engine
@@ -89,12 +91,7 @@ pub fn session_cwd(manager: &WikiEngine) -> PathBuf {
 
 /// Load the cancellation flag for a session. Returns None if session not found.
 pub fn get_cancelled(sessions: &Sessions, session_id: &str) -> Option<Arc<AtomicBool>> {
-    sessions
-        .lock()
-        .get(session_id)?
-        .cancelled
-        .clone()
-        .into()
+    sessions.lock().get(session_id)?.cancelled.clone().into()
 }
 
 pub fn clear_active_run(sessions: &Sessions, session_id: &str) {

@@ -160,9 +160,7 @@ pub fn schema_remove(
         bail!("cannot remove the 'default' type");
     }
 
-    let engine = manager
-        .state
-        .read();
+    let engine = manager.state.read();
     let space = engine.space(wiki_name)?;
 
     // Count pages of this type in the index
