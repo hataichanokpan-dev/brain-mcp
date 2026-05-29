@@ -19,6 +19,7 @@ use rmcp::model::{
     ResourceContents, ServerCapabilities, ServerInfo,
 };
 use rmcp::service::{RequestContext, RoleServer};
+use tokio::sync::mpsc;
 
 use crate::engine::{EngineState, WikiEngine};
 use crate::markdown;
@@ -31,17 +32,42 @@ use crate::slug::{Slug, WikiUri};
 pub struct McpServer {
     /// Shared wiki engine handle.
     pub manager: Arc<WikiEngine>,
+    /// Optional channel used by `serve --web` to refresh the Hugo server after writes.
+    web_refresh_tx: Option<mpsc::Sender<String>>,
 }
 
 impl McpServer {
     /// Create a new `McpServer` wrapping `manager`.
     pub fn new(manager: Arc<WikiEngine>) -> Self {
-        Self { manager }
+        Self {
+            manager,
+            web_refresh_tx: None,
+        }
+    }
+
+    /// Create a new `McpServer` with web-refresh notifications enabled.
+    pub fn with_web_refresh(
+        manager: Arc<WikiEngine>,
+        web_refresh_tx: mpsc::Sender<String>,
+    ) -> Self {
+        Self {
+            manager,
+            web_refresh_tx: Some(web_refresh_tx),
+        }
     }
 
     /// Acquire a read guard on the engine state.
     pub fn engine(&self) -> parking_lot::RwLockReadGuard<'_, EngineState> {
         self.manager.state.read()
+    }
+
+    /// Notify the optional web supervisor that content for `wiki_name` changed.
+    pub fn notify_web_refresh(&self, wiki_name: &str) {
+        if let Some(tx) = &self.web_refresh_tx
+            && let Err(e) = tx.try_send(wiki_name.to_string())
+        {
+            tracing::warn!(wiki = %wiki_name, error = %e, "web refresh notification dropped");
+        }
     }
 
     fn list_wiki_resources(&self) -> Vec<rmcp::model::Resource> {

@@ -17,6 +17,14 @@ enum WatchAction {
     RebuildIndex,
 }
 
+fn notify_web_refresh(tx: &Option<tokio::sync::mpsc::Sender<String>>, wiki_name: &str) {
+    if let Some(tx) = tx
+        && let Err(e) = tx.try_send(wiki_name.to_string())
+    {
+        tracing::warn!(wiki = %wiki_name, error = %e, "watch: web refresh notification dropped");
+    }
+}
+
 // ── run_watcher ───────────────────────────────────────────────────────────────
 
 /// Start watching all mounted wikis. Runs until the cancellation token fires.
@@ -26,6 +34,7 @@ pub async fn run_watcher(
     debounce_ms: u32,
     cancel: CancellationToken,
     push_tx: tokio::sync::mpsc::Sender<(String, String)>,
+    web_refresh_tx: Option<tokio::sync::mpsc::Sender<String>>,
 ) -> Result<()> {
     let (tx, mut rx) = mpsc::channel::<(String, PathBuf)>(256);
 
@@ -93,6 +102,7 @@ pub async fn run_watcher(
                                     "watch: web content sync failed",
                                 );
                             }
+                            notify_web_refresh(&web_refresh_tx, wiki_name);
                             tracing::info!(
                                 wiki = %wiki_name,
                                 duration_ms = start.elapsed().as_millis() as u64,
@@ -141,6 +151,7 @@ pub async fn run_watcher(
                                         "watch: web content sync failed",
                                     );
                                 }
+                                notify_web_refresh(&web_refresh_tx, wiki_name);
                                 tracing::info!(
                                     wiki = %wiki_name,
                                     files = wiki_paths.len(),

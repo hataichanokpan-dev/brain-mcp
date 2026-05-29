@@ -13,7 +13,12 @@ fn sync_web_content(server: &McpServer, wiki_name: &str) -> Result<Option<usize>
         let space = engine.space(wiki_name).map_err(|e| format!("{e}"))?;
         (space.repo_root.clone(), space.wiki_root.clone())
     };
-    crate::web::sync_installed_hugo_content(&repo_root, &wiki_root).map_err(|e| format!("{e}"))
+    let synced = crate::web::sync_installed_hugo_content(&repo_root, &wiki_root)
+        .map_err(|e| format!("{e}"))?;
+    if synced.is_some() {
+        server.notify_web_refresh(wiki_name);
+    }
+    Ok(synced)
 }
 
 // ── Spaces ────────────────────────────────────────────────────────────────────

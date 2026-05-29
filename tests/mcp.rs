@@ -6,6 +6,7 @@ use llm_wiki::engine::WikiEngine;
 use llm_wiki::git;
 use llm_wiki::mcp::{McpServer, tools};
 use llm_wiki::spaces;
+use llm_wiki::web;
 use serde_json::{Map, Value, json};
 
 #[test]
@@ -184,6 +185,33 @@ fn mcp_content_write_places_bare_concept_in_concepts() {
             .exists()
     );
     assert!(!repo_root.join("wiki/thai-tts-voice-cloning.md").exists());
+}
+
+#[test]
+fn mcp_content_write_notifies_managed_web_refresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (config_path, repo_root) = setup_mcp_smoke_wiki(dir.path());
+    web::install_hugo_site(&repo_root, "test", "wiki", false).unwrap();
+    let manager = Arc::new(WikiEngine::build(&config_path).unwrap());
+    let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+    let server = McpServer::with_web_refresh(manager, tx);
+
+    let result = tools::call(
+        &server,
+        "wiki_content_write",
+        &args(json!({
+            "uri": "managed-web-refresh",
+            "wiki": "test",
+            "content": "---\ntitle: \"Managed Web Refresh\"\ntype: concept\nstatus: active\n---\n\nFresh body.\n"
+        })),
+    );
+
+    assert!(!result.is_error);
+    assert_eq!(rx.try_recv().unwrap(), "test");
+    let mirrored =
+        fs::read_to_string(repo_root.join("site/content/concepts/managed-web-refresh.md")).unwrap();
+    assert!(mirrored.contains("Fresh body."));
+    assert!(repo_root.join("site/content/.llm-wiki-refresh").exists());
 }
 
 #[test]
