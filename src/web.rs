@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
@@ -164,13 +165,10 @@ pub fn sync_hugo_content(repo_root: &Path, wiki_root: &str) -> Result<usize> {
         );
     }
 
-    if content_root.exists() {
-        fs::remove_dir_all(&content_root)
-            .with_context(|| format!("failed to remove {}", content_root.display()))?;
-    }
     fs::create_dir_all(&content_root)
         .with_context(|| format!("failed to create {}", content_root.display()))?;
 
+    let mut expected_files = std::collections::HashSet::new();
     let mut synced = 0usize;
     for entry in WalkDir::new(&source_root)
         .into_iter()
@@ -192,6 +190,8 @@ pub fn sync_hugo_content(repo_root: &Path, wiki_root: &str) -> Result<usize> {
             fs::create_dir_all(parent)
                 .with_context(|| format!("failed to create {}", parent.display()))?;
         }
+        let relative_dest = dest.strip_prefix(&content_root)?.to_path_buf();
+        expected_files.insert(relative_dest);
         fs::copy(entry.path(), &dest).with_context(|| {
             format!(
                 "failed to copy {} to {}",
@@ -201,6 +201,9 @@ pub fn sync_hugo_content(repo_root: &Path, wiki_root: &str) -> Result<usize> {
         })?;
         synced += 1;
     }
+
+    remove_stale_content_files(&content_root, &expected_files)?;
+    touch_refresh_marker(&content_root)?;
 
     Ok(synced)
 }
@@ -347,6 +350,46 @@ fn should_skip_content_file(relative: &Path) -> bool {
     )
 }
 
+fn remove_stale_content_files(
+    content_root: &Path,
+    expected_files: &std::collections::HashSet<PathBuf>,
+) -> Result<()> {
+    for entry in WalkDir::new(content_root)
+        .contents_first(true)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if path == content_root {
+            continue;
+        }
+        if entry.file_type().is_file() {
+            let relative = path.strip_prefix(content_root)?;
+            if relative.file_name().and_then(|n| n.to_str()) == Some(".llm-wiki-refresh") {
+                continue;
+            }
+            if !expected_files.contains(relative) {
+                fs::remove_file(path)
+                    .with_context(|| format!("failed to remove stale {}", path.display()))?;
+            }
+        } else if entry.file_type().is_dir() && fs::read_dir(path)?.next().is_none() {
+            fs::remove_dir(path)
+                .with_context(|| format!("failed to remove empty {}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn touch_refresh_marker(content_root: &Path) -> Result<()> {
+    let marker = content_root.join(".llm-wiki-refresh");
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    fs::write(&marker, format!("{timestamp}\n"))
+        .with_context(|| format!("failed to write {}", marker.display()))
+}
+
 fn is_section_index(path: &Path) -> Result<bool> {
     if path.file_name().and_then(|n| n.to_str()) != Some("index.md") {
         return Ok(false);
@@ -429,6 +472,30 @@ mod tests {
                 .exists()
         );
         assert!(!tmp.path().join("site/content/concepts/index.md").exists());
+    }
+
+    #[test]
+    fn sync_removes_stale_content_and_touches_refresh_marker() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("wiki/concepts")).unwrap();
+        std::fs::write(
+            tmp.path().join("wiki/concepts/current.md"),
+            "---\ntitle: Current\ntype: concept\n---\n\nCurrent body.\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(tmp.path().join("site/content/concepts")).unwrap();
+        std::fs::write(
+            tmp.path().join("site/content/concepts/stale.md"),
+            "---\ntitle: Stale\ntype: concept\n---\n\nStale body.\n",
+        )
+        .unwrap();
+
+        let synced = sync_hugo_content(tmp.path(), "wiki").unwrap();
+
+        assert_eq!(synced, 1);
+        assert!(tmp.path().join("site/content/concepts/current.md").exists());
+        assert!(!tmp.path().join("site/content/concepts/stale.md").exists());
+        assert!(tmp.path().join("site/content/.llm-wiki-refresh").exists());
     }
 
     #[test]

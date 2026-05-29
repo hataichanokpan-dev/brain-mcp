@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,12 +14,27 @@ use rmcp::transport::streamable_http_server::session::local::{LocalSessionManage
 use rmcp::transport::streamable_http_server::session::never::NeverSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use serde::Serialize;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::config;
 use crate::engine::WikiEngine;
 use crate::mcp::McpServer;
+
+/// Configuration for the managed Hugo web UI spawned by `serve --web`.
+#[derive(Debug, Clone)]
+pub struct WebServeConfig {
+    pub wiki: Option<String>,
+    pub bind: String,
+    pub port: u16,
+    pub drafts: bool,
+}
+
+struct WebTarget {
+    wiki_name: String,
+    repo_root: PathBuf,
+    wiki_root: String,
+}
 
 // ── serve_stdio ───────────────────────────────────────────────────────────────
 
@@ -158,6 +174,131 @@ async fn serve_http(
     unreachable!()
 }
 
+// ── web supervisor ────────────────────────────────────────────────────────────
+
+fn selected_web_target(manager: &WikiEngine, explicit_wiki: Option<&str>) -> Result<WebTarget> {
+    let engine = manager.state.read();
+    let wiki_name = engine.resolve_wiki_name(explicit_wiki).to_string();
+    let space = engine.space(&wiki_name)?;
+    let repo_root = space.repo_root.clone();
+    let wiki_root = space
+        .wiki_root
+        .strip_prefix(&space.repo_root)
+        .unwrap_or_else(|_| std::path::Path::new("wiki"))
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok(WebTarget {
+        wiki_name,
+        repo_root,
+        wiki_root,
+    })
+}
+
+fn prepare_web_target(target: &WebTarget) -> Result<()> {
+    if !crate::web::is_installed(&target.repo_root) {
+        crate::web::install_hugo_site(
+            &target.repo_root,
+            &target.wiki_name,
+            &target.wiki_root,
+            false,
+        )?;
+    } else {
+        crate::web::sync_hugo_content(&target.repo_root, &target.wiki_root)?;
+    }
+    Ok(())
+}
+
+fn restart_hugo_child(
+    child: &mut std::process::Child,
+    target: &WebTarget,
+    cfg: &WebServeConfig,
+) -> Result<()> {
+    if let Err(e) = child.kill() {
+        tracing::warn!(error = %e, "failed to stop Hugo before refresh restart");
+    }
+    let _ = child.wait();
+    *child = crate::web::spawn_hugo_server(&target.repo_root, &cfg.bind, cfg.port, cfg.drafts)?;
+    Ok(())
+}
+
+async fn drain_refresh_events(
+    rx: &mut mpsc::Receiver<String>,
+    selected_wiki: &str,
+    debounce: Duration,
+) -> bool {
+    let mut refresh_selected = false;
+    let deadline = tokio::time::sleep(debounce);
+    tokio::pin!(deadline);
+
+    loop {
+        tokio::select! {
+            value = rx.recv() => match value {
+                Some(wiki) => {
+                    if wiki == selected_wiki {
+                        refresh_selected = true;
+                    }
+                }
+                None => break,
+            },
+            _ = &mut deadline => break,
+        }
+    }
+
+    refresh_selected
+}
+
+async fn run_web_supervisor(
+    target: WebTarget,
+    cfg: WebServeConfig,
+    mut child: std::process::Child,
+    mut rx: mpsc::Receiver<String>,
+    cancel: CancellationToken,
+) {
+    let mut health = tokio::time::interval(Duration::from_secs(5));
+    let refresh_debounce = Duration::from_millis(750);
+
+    loop {
+        tokio::select! {
+            _ = cancel.cancelled() => break,
+            maybe_wiki = rx.recv() => {
+                let Some(wiki) = maybe_wiki else {
+                    break;
+                };
+                let mut refresh_selected = wiki == target.wiki_name;
+                refresh_selected |= drain_refresh_events(&mut rx, &target.wiki_name, refresh_debounce).await;
+                if refresh_selected {
+                    if let Err(e) = prepare_web_target(&target)
+                        .and_then(|_| restart_hugo_child(&mut child, &target, &cfg))
+                    {
+                        tracing::error!(wiki = %target.wiki_name, error = %e, "managed Hugo refresh failed");
+                    } else {
+                        tracing::info!(wiki = %target.wiki_name, "managed Hugo refreshed");
+                    }
+                }
+            }
+            _ = health.tick() => {
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        tracing::warn!(wiki = %target.wiki_name, %status, "Hugo exited, restarting");
+                        match crate::web::spawn_hugo_server(&target.repo_root, &cfg.bind, cfg.port, cfg.drafts) {
+                            Ok(next) => child = next,
+                            Err(e) => tracing::error!(wiki = %target.wiki_name, error = %e, "failed to restart Hugo"),
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => tracing::warn!(wiki = %target.wiki_name, error = %e, "failed to check Hugo status"),
+                }
+            }
+        }
+    }
+
+    if let Err(e) = child.kill() {
+        tracing::warn!(error = %e, "failed to stop managed Hugo");
+    }
+    let _ = child.wait();
+    tracing::info!(wiki = %target.wiki_name, "managed Hugo stopped");
+}
+
 // ── serve (orchestration) ─────────────────────────────────────────────────────
 
 /// Start the wiki server — spawns stdio, HTTP, ACP, and watcher transports as configured.
@@ -166,6 +307,7 @@ pub async fn serve(
     http_port: Option<u16>,
     acp: bool,
     watch: bool,
+    web: Option<WebServeConfig>,
 ) -> Result<()> {
     // 1. Build WikiEngine
     let manager = Arc::new(WikiEngine::build(config_path)?);
@@ -190,6 +332,9 @@ pub async fn serve(
     if watch {
         transports.push("watch".to_string());
     }
+    if web.is_some() {
+        transports.push("web".to_string());
+    }
     tracing::info!(
         wikis = wiki_count,
         transports = %transports.join("] ["),
@@ -209,8 +354,18 @@ pub async fn serve(
         let _ = shutdown_tx.send(true);
     });
 
-    // 4. Build MCP server
-    let mcp_server = McpServer::new(manager.clone());
+    // 4. Build MCP server and optional managed web-refresh channel.
+    let (web_refresh_tx, web_refresh_rx) = if web.is_some() {
+        let (tx, rx) = mpsc::channel::<String>(128);
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+    let mcp_server = if let Some(tx) = web_refresh_tx.clone() {
+        McpServer::with_web_refresh(manager.clone(), tx)
+    } else {
+        McpServer::new(manager.clone())
+    };
 
     // 5. Heartbeat task
     if serve_cfg.heartbeat_secs > 0 {
@@ -245,6 +400,7 @@ pub async fn serve(
             engine.config.watch.debounce_ms
         };
         let push_tx_watch = push_tx;
+        let web_refresh_tx_watch = web_refresh_tx.clone();
         Some(tokio::spawn(async move {
             let max_retries: u32 = 5;
             let mut backoff = Duration::from_secs(1);
@@ -258,6 +414,7 @@ pub async fn serve(
                         debounce,
                         cancel_watch.clone(),
                         push_tx_watch.clone(),
+                        web_refresh_tx_watch.clone(),
                     ),
                 )
                 .await;
@@ -290,6 +447,29 @@ pub async fn serve(
         }))
     } else {
         drop(push_tx);
+        None
+    };
+
+    let web_handle = if let (Some(web_cfg), Some(rx)) = (web, web_refresh_rx) {
+        let target = selected_web_target(&manager, web_cfg.wiki.as_deref())?;
+        prepare_web_target(&target)?;
+        tracing::info!(
+            wiki = %target.wiki_name,
+            bind = %web_cfg.bind,
+            port = web_cfg.port,
+            "starting managed Hugo web UI",
+        );
+        let child = crate::web::spawn_hugo_server(
+            &target.repo_root,
+            &web_cfg.bind,
+            web_cfg.port,
+            web_cfg.drafts,
+        )?;
+        let cancel_web = cancel.clone();
+        Some(tokio::spawn(async move {
+            run_web_supervisor(target, web_cfg, child, rx, cancel_web).await;
+        }))
+    } else {
         None
     };
 
@@ -342,6 +522,10 @@ pub async fn serve(
     }
 
     if let Some(handle) = watch_handle {
+        handle.abort();
+        let _ = handle.await;
+    }
+    if let Some(handle) = web_handle {
         handle.abort();
         let _ = handle.await;
     }

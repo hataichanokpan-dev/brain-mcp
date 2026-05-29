@@ -725,29 +725,26 @@ fn main() -> Result<()> {
             let http_port = http
                 .and_then(|opt| opt.and_then(|s| s.trim_start_matches(':').parse::<u16>().ok()));
 
-            let mut web_child = if web {
-                let (wiki_name, repo_root, wiki_root) =
-                    selected_wiki_paths(&config_path, cli.wiki.as_deref())?;
-                if !llm_wiki::web::is_installed(&repo_root) {
-                    llm_wiki::web::install_hugo_site(&repo_root, &wiki_name, &wiki_root, false)?;
-                } else {
-                    llm_wiki::web::sync_hugo_content(&repo_root, &wiki_root)?;
-                }
+            let web_config = if web {
                 println!("Web UI: http://{web_bind}:{web_port}/");
-                Some(llm_wiki::web::spawn_hugo_server(
-                    &repo_root, &web_bind, web_port, true,
-                )?)
+                Some(llm_wiki::server::WebServeConfig {
+                    wiki: cli.wiki.clone(),
+                    bind: web_bind,
+                    port: web_port,
+                    drafts: true,
+                })
             } else {
                 None
             };
 
             let rt = tokio::runtime::Runtime::new()?;
-            let result = rt.block_on(llm_wiki::server::serve(&config_path, http_port, acp, watch));
-            if let Some(child) = web_child.as_mut() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-            result?;
+            rt.block_on(llm_wiki::server::serve(
+                &config_path,
+                http_port,
+                acp,
+                watch,
+                web_config,
+            ))?;
         }
 
         // ── Stats ───────────────────────────────────────────────────────
@@ -861,7 +858,7 @@ fn main() -> Result<()> {
                     cancel_for_signal.cancel();
                 });
                 let (push_tx, _push_rx) = tokio::sync::mpsc::channel(1);
-                llm_wiki::watch::run_watcher(manager, debounce, cancel, push_tx).await
+                llm_wiki::watch::run_watcher(manager, debounce, cancel, push_tx, None).await
             })?;
             let _ = wiki; // reserved for future single-wiki watch
         }

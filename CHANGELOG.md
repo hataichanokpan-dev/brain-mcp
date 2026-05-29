@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.15] - 2026-05-29
+
+### Added
+
+- **Managed web refresh supervisor** — `serve --web` now owns the Hugo process inside the server runtime and restarts it after MCP/write/watch refresh events with debounce.
+
+### Changed
+
+- **Web mirror refresh** — Hugo content sync now reconciles files incrementally, removes stale mirrored pages, and writes a `.llm-wiki-refresh` marker to force file-watch updates.
+
+### Fixed
+
+- **Stale web pages after MCP writes** — `wiki_content_write`, `wiki_content_new`, `wiki_ingest`, `wiki_index_rebuild`, and watcher-triggered updates now notify the managed web supervisor after syncing content.
+
 ## [0.4.14] - 2026-05-29
 
 ### Added
