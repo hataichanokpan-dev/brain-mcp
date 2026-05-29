@@ -13,7 +13,7 @@ fn index_rebuild_and_status() {
     let report = ops::index_rebuild(&manager, "test").unwrap();
     assert!(report.pages_indexed >= 2);
 
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let status = ops::index_status(&engine, "test").unwrap();
     assert!(status.openable);
     assert!(status.queryable);

@@ -9,7 +9,7 @@ fn content_read_page() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     match ops::content_read(&engine, "concepts/moe", None, false, false).unwrap() {
         ops::ContentReadResult::Page(content) => {
@@ -24,7 +24,7 @@ fn content_read_no_frontmatter() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     match ops::content_read(&engine, "concepts/moe", None, true, false).unwrap() {
         ops::ContentReadResult::Page(content) => {
@@ -40,7 +40,7 @@ fn content_read_bare_slug_falls_back_to_blueprint_sections() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     match ops::content_read(&engine, "moe", None, true, false).unwrap() {
         ops::ContentReadResult::Page(content) => {
@@ -55,7 +55,7 @@ fn content_write_and_read_back() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let body = "---\ntitle: \"New\"\ntype: page\n---\n\nHello.\n";
     let result = ops::content_write(&engine, "new-page", None, body).unwrap();
@@ -72,7 +72,7 @@ fn content_commit_rehomes_bare_concept_slug() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.space("test").unwrap();
 
     let root_file = space.wiki_root.join("thai-tts-voice-cloning.md");
@@ -106,7 +106,7 @@ fn content_new_page() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::content_new(
         &engine,
@@ -130,7 +130,7 @@ fn content_new_section() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::content_new(&engine, "topics", None, true, false, None, None).unwrap();
     assert!(result.uri.contains("topics"));
@@ -141,7 +141,7 @@ fn content_new_bundle_result_has_path_and_wiki_root() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result =
         ops::content_new(&engine, "concepts/bundled", None, false, true, None, None).unwrap();
@@ -156,7 +156,7 @@ fn content_commit_all() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     // Write a new file so there's something to commit
     ops::content_write(

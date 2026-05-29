@@ -9,7 +9,7 @@ fn graph_build_returns_nodes() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::graph_build(
         &engine,
@@ -34,7 +34,7 @@ fn graph_build_dot_format() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::graph_build(
         &engine,

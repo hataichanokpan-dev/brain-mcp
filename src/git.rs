@@ -106,8 +106,7 @@ where
 
 fn is_lock_error(err: &anyhow::Error) -> bool {
     let msg = format!("{err:#}");
-    msg.to_lowercase().contains("lock")
-        || msg.contains(".git/index.lock")
+    msg.to_lowercase().contains("lock") || msg.contains(".git/index.lock")
 }
 
 fn try_remove_lock(repo_root: &Path) {

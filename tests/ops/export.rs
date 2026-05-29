@@ -10,7 +10,7 @@ fn export_llms_txt_writes_file_and_reports() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let report = ops::export(
         &engine,
@@ -40,7 +40,7 @@ fn export_llms_full_includes_page_bodies() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let report = ops::export(
         &engine,
@@ -67,7 +67,7 @@ fn export_json_produces_valid_json_array() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let report = ops::export(
         &engine,
@@ -99,7 +99,7 @@ fn export_default_path_resolves_to_wiki_root() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let report = ops::export(
         &engine,
@@ -143,7 +143,7 @@ fn export_excludes_archived_by_default() {
         let wiki_name = "test".to_string();
         ops::index_rebuild(&manager, &wiki_name).unwrap();
     }
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let report = ops::export(
         &engine,

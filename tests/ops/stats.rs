@@ -8,7 +8,7 @@ fn stats_returns_metrics() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "test").unwrap();
     assert_eq!(result.wiki, "test");
@@ -21,7 +21,7 @@ fn stats_orphan_count() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "test").unwrap();
     // Both pages are concepts with no inbound edges from other types
@@ -37,7 +37,7 @@ fn stats_staleness_buckets_sum_to_total() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "test").unwrap();
     let staleness_total =
@@ -56,7 +56,7 @@ fn stats_on_empty_wiki() {
     llm_wiki::spaces::create(&wiki_path, "empty", None, false, true, &config_path, None).unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "empty").unwrap();
     assert_eq!(result.pages, 0);
@@ -99,7 +99,7 @@ fn stats_structural_fields_present_on_connected_graph() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki_with_cycle(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "test").unwrap();
     // Structural fields must always be present as keys (Some or None)
@@ -149,7 +149,7 @@ fn stats_structural_fields_null_when_disabled() {
     std::fs::write(&config_path, patched).unwrap();
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
 
     let result = ops::stats(&engine, "test").unwrap();
     assert!(

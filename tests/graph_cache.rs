@@ -40,7 +40,7 @@ fn graph_cache_hit_returns_same_arc() {
     let config_path = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
 
     let searcher = space.index_manager.searcher().unwrap();
@@ -78,7 +78,7 @@ fn graph_cache_miss_on_filtered_request() {
     let config_path = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
 
     let searcher = space.index_manager.searcher().unwrap();
@@ -120,7 +120,7 @@ fn graph_cache_hit_is_faster_than_miss() {
     let config_path = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
 
     let searcher = space.index_manager.searcher().unwrap();
@@ -165,7 +165,7 @@ fn get_cached_community_map_returns_none_for_small_graph() {
     let config_path = setup_wiki(dir.path(), "test");
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
 
     let searcher = space.index_manager.searcher().unwrap();
@@ -190,7 +190,7 @@ fn get_cached_community_stats_returns_none_for_small_graph() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
     let searcher = space.index_manager.searcher().unwrap();
 
@@ -258,7 +258,7 @@ fn cross_wiki_merge_cached_graphs_matches_build_graph_cross_wiki() {
     );
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let filter = GraphFilter::default();
 
     // Build via merge_cached_graphs (the new path)
@@ -335,7 +335,7 @@ fn cross_wiki_merge_keeps_external_when_target_wiki_missing() {
     );
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let filter = GraphFilter::default();
 
     let sp = engine.spaces.get("alpha").unwrap();
@@ -370,7 +370,7 @@ fn community_stats_and_map_are_consistent() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = setup_wiki(dir.path(), "test");
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
     let searcher = space.index_manager.searcher().unwrap();
 
@@ -412,7 +412,7 @@ fn graph_cache_invalidated_after_rebuild() {
     let manager = WikiEngine::build(&config_path).unwrap();
 
     let arc1 = {
-        let engine = manager.state.read().unwrap();
+        let engine = manager.state.read();
         let space = engine.spaces.get("test").unwrap();
         let searcher = space.index_manager.searcher().unwrap();
         get_or_build_graph(
@@ -428,7 +428,7 @@ fn graph_cache_invalidated_after_rebuild() {
 
     // Trigger rebuild — bumps generation
     {
-        let engine = manager.state.read().unwrap();
+        let engine = manager.state.read();
         let space = engine.spaces.get("test").unwrap();
         space
             .index_manager
@@ -442,7 +442,7 @@ fn graph_cache_invalidated_after_rebuild() {
     }
 
     let arc2 = {
-        let engine = manager.state.read().unwrap();
+        let engine = manager.state.read();
         let space = engine.spaces.get("test").unwrap();
         let searcher = space.index_manager.searcher().unwrap();
         get_or_build_graph(
@@ -503,7 +503,7 @@ fn get_cached_community_stats_returns_some_for_graph_above_min_nodes_threshold()
     );
 
     let manager = WikiEngine::build(&config_path).unwrap();
-    let engine = manager.state.read().unwrap();
+    let engine = manager.state.read();
     let space = engine.spaces.get("test").unwrap();
     let searcher = space.index_manager.searcher().unwrap();
 

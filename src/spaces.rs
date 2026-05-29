@@ -10,9 +10,7 @@ use crate::git;
 
 /// Canonicalize a path and strip the `\\?\` UNC prefix that Windows returns.
 fn normalize_canonical(path: &Path) -> PathBuf {
-    let p = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let s = p.to_string_lossy();
     if let Some(stripped) = s.strip_prefix(r"\\?\") {
         PathBuf::from(stripped)

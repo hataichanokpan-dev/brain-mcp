@@ -314,7 +314,14 @@ pub async fn serve(
         });
 
         if http_enabled {
-            serve_http(mcp_server, resolved_port, &serve_cfg, cancel, manager.clone()).await?;
+            serve_http(
+                mcp_server,
+                resolved_port,
+                &serve_cfg,
+                cancel,
+                manager.clone(),
+            )
+            .await?;
         } else {
             serve_stdio(mcp_server, shutdown_rx).await?;
         }
@@ -322,7 +329,14 @@ pub async fn serve(
         acp_handle.abort();
         let _ = acp_handle.await;
     } else if http_enabled {
-        serve_http(mcp_server, resolved_port, &serve_cfg, cancel, manager.clone()).await?;
+        serve_http(
+            mcp_server,
+            resolved_port,
+            &serve_cfg,
+            cancel,
+            manager.clone(),
+        )
+        .await?;
     } else {
         serve_stdio(mcp_server, shutdown_rx).await?;
     }

@@ -111,10 +111,7 @@ pub async fn run_watcher(
             }
             WatchAction::IngestPages(paths) => {
                 // Group by wiki
-                let state = engine
-                    .state
-                    .read()
-                    ;
+                let state = engine.state.read();
                 for (wiki_name, space) in &state.spaces {
                     let wiki_paths: Vec<&PathBuf> = paths
                         .iter()
@@ -191,14 +188,12 @@ fn classify_event(
 }
 
 fn is_schema_path(path: &Path) -> bool {
-    path.components()
-        .any(|c| c.as_os_str() == "schemas")
+    path.components().any(|c| c.as_os_str() == "schemas")
         && path.extension().and_then(|e| e.to_str()) == Some("json")
 }
 
 fn is_wiki_md(path: &Path) -> bool {
-    path.components()
-        .any(|c| c.as_os_str() == "wiki")
+    path.components().any(|c| c.as_os_str() == "wiki")
         && path.extension().and_then(|e| e.to_str()) == Some("md")
 }
 
@@ -207,10 +202,7 @@ fn start_notify_watcher(
     tx: mpsc::Sender<(String, PathBuf)>,
     cancel: CancellationToken,
 ) -> Result<RecommendedWatcher> {
-    let state = engine
-        .state
-        .read()
-        ;
+    let state = engine.state.read();
 
     // Build a map of watched paths to wiki names
     let mut watch_dirs: Vec<(String, PathBuf, PathBuf)> = Vec::new();
